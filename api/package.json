@@ -1,0 +1,10 @@
+{
+  "name": "formdrop-server",
+  "version": "2.0.0",
+  "description": "FormDrop — Vercel serverless + Postgres",
+  "dependencies": {
+    "nodemailer": "^6.9.13",
+    "pg": "^8.11.5",
+    "xlsx": "^0.18.5"
+  }
+}

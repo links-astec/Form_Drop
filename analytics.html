@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Analytics — FormDrop</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+:root{--bg:#f7f5f0;--surface:#fff;--surface2:#f0ede6;--border:#e2ddd4;--border2:#ccc7bc;--text:#1a1916;--text2:#6b6760;--text3:#a8a49e;--accent:#2a5c45;--accent-light:#e8f2ed;--accent-text:#1d3f2f;--danger:#c0392b;--radius-lg:14px}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:15px}
+header{background:var(--surface);border-bottom:1px solid var(--border);padding:0 2rem;height:58px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.logo{font-size:17px;font-weight:600;letter-spacing:-.3px;display:flex;align-items:center;gap:8px}
+.logo-dot{width:8px;height:8px;background:var(--accent);border-radius:50%}
+.header-right{display:flex;align-items:center;gap:10px}
+.btn{font-family:'DM Sans',sans-serif;font-size:13.5px;font-weight:500;padding:7px 16px;border-radius:8px;border:1px solid var(--border2);background:var(--surface);color:var(--text);cursor:pointer;transition:background .15s}
+.btn:hover{background:var(--surface2)}
+.btn-primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn-primary:hover{background:#1d3f2f}
+.main{max-width:960px;margin:0 auto;padding:2rem 1.5rem 5rem}
+.page-title{font-size:24px;font-weight:600;letter-spacing:-.4px;margin-bottom:4px}
+.page-sub{font-size:14px;color:var(--text2);margin-bottom:2rem;line-height:1.5}
+
+/* CONFIG CARD */
+.config-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem 1.5rem;margin-bottom:1.5rem}
+.config-row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
+.config-field{flex:1;min-width:220px}
+.config-label{font-size:12px;font-weight:500;color:var(--text2);margin-bottom:5px;letter-spacing:.3px;text-transform:uppercase;display:block}
+.config-input{font-family:'DM Mono',monospace;font-size:13px;padding:9px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);outline:none;width:100%}
+.config-input:focus{border-color:var(--accent)}
+.config-status{font-size:12.5px;margin-top:8px;color:var(--text3)}
+.config-status.ok{color:var(--accent)}
+.config-status.err{color:var(--danger)}
+
+/* STATS */
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:2rem}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1rem 1.25rem}
+.stat-label{font-size:12px;color:var(--text2);margin-bottom:4px;font-weight:500;text-transform:uppercase;letter-spacing:.4px}
+.stat-value{font-size:26px;font-weight:600;letter-spacing:-.5px}
+.stat-sub{font-size:12px;color:var(--text3);margin-top:2px}
+
+/* TIMELINE */
+.timeline-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.5rem;margin-bottom:2rem}
+.section-title{font-size:15px;font-weight:600;margin-bottom:1rem}
+.timeline-wrap{position:relative;height:120px}
+.timeline-wrap canvas{display:block}
+
+/* QUESTIONS GRID */
+.questions-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:16px;margin-bottom:2rem}
+.q-analytics-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.5rem;overflow:hidden}
+.qa-title{font-size:14.5px;font-weight:500;margin-bottom:4px;line-height:1.4}
+.qa-meta{font-size:12px;color:var(--text3);margin-bottom:1.25rem}
+.chart-wrap{display:flex;align-items:center;gap:1.5rem;flex-wrap:wrap}
+.legend{flex:1;min-width:140px;display:flex;flex-direction:column;gap:7px}
+.legend-item{display:flex;align-items:center;gap:8px;font-size:13px}
+.legend-dot{width:11px;height:11px;border-radius:50%;flex-shrink:0}
+.legend-label{flex:1;color:var(--text);line-height:1.3}
+.legend-pct{font-weight:600;font-size:13px;font-family:'DM Mono',monospace}
+.text-answers{display:flex;flex-direction:column;gap:6px;max-height:220px;overflow-y:auto}
+.text-answer{font-size:13.5px;background:var(--bg);border:1px solid var(--border);border-radius:7px;padding:7px 10px;color:var(--text2);line-height:1.4}
+.no-answers{font-size:13px;color:var(--text3);font-style:italic}
+
+/* TABLE */
+.table-section{margin-top:2rem}
+.resp-table-wrap{overflow-x:auto;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg)}
+.resp-table{width:100%;border-collapse:collapse;font-size:13px}
+.resp-table th{text-align:left;padding:10px 14px;background:var(--surface2);border-bottom:1px solid var(--border);font-weight:500;color:var(--text2);white-space:nowrap}
+.resp-table td{padding:10px 14px;border-bottom:1px solid var(--border);color:var(--text);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.resp-table tr:last-child td{border-bottom:none}
+.resp-table tr:hover td{background:var(--surface2)}
+.badge{display:inline-block;font-size:11px;font-weight:500;padding:2px 8px;border-radius:30px;background:var(--accent-light);color:var(--accent)}
+.export-row{display:flex;gap:10px;margin-top:1rem;flex-wrap:wrap}
+
+/* STATES */
+.empty-state{text-align:center;padding:4rem 1.5rem;color:var(--text2)}
+.empty-state h2{font-size:20px;font-weight:600;margin-bottom:8px;color:var(--text)}
+.empty-state p{font-size:14px;line-height:1.6}
+.loading-msg{text-align:center;padding:3rem;color:var(--text3);font-size:14px}
+
+@media(max-width:600px){.main{padding:1.25rem 1rem 4rem}.questions-grid{grid-template-columns:1fr}header{padding:0 1rem}}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo"><div class="logo-dot"></div>FormDrop Analytics</div>
+  <div class="header-right">
+    <button class="btn" onclick="window.location.href='builder.html'">← Builder</button>
+    <button class="btn btn-primary" id="export-btn" onclick="exportXLSX()" style="display:none">Export XLSX</button>
+  </div>
+</header>
+
+<div class="main">
+  <div class="page-title">Analytics</div>
+  <div class="page-sub">Live response data pulled from your database.</div>
+
+  <div class="config-card">
+    <div class="config-row">
+      <div class="config-field">
+        <label class="config-label">Server URL</label>
+        <input class="config-input" id="server-url" type="url" placeholder="https://my-formdrop.vercel.app/api" oninput="saveServerUrl()"/>
+      </div>
+      <div class="config-field">
+        <label class="config-label">Form ID</label>
+        <input class="config-input" id="form-id-input" type="text" placeholder="xxxxxxxx-xxxx-4xxx-xxxx-xxxxxxxxxxxx" oninput="saveFormId()"/>
+      </div>
+      <button class="btn btn-primary" onclick="loadAnalytics()">Load</button>
+    </div>
+    <div class="config-status" id="config-status">Enter your server URL and form ID, then click Load.</div>
+  </div>
+
+  <div id="analytics-body"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script>
+const COLORS=['#2a5c45','#4a9e7d','#f59e0b','#3b82f6','#ec4899','#8b5cf6','#ef4444','#14b8a6','#f97316','#6366f1'];
+
+// Persist config
+function saveServerUrl() {
+  localStorage.setItem('fd_server_url', document.getElementById('server-url').value.trim());
+}
+function saveFormId() {
+  localStorage.setItem('fd_analytics_form_id', document.getElementById('form-id-input').value.trim());
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  const url = localStorage.getItem('fd_server_url') || '';
+  const id  = localStorage.getItem('fd_form_uuid') || localStorage.getItem('fd_analytics_form_id') || '';
+  document.getElementById('server-url').value = url;
+  document.getElementById('form-id-input').value = id;
+});
+
+let currentData = null;
+let chartInstances = [];
+
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+async function loadAnalytics() {
+  const serverUrl = document.getElementById('server-url').value.trim().replace(/\/$/,'');
+  const formId    = document.getElementById('form-id-input').value.trim();
+  const status    = document.getElementById('config-status');
+  const body      = document.getElementById('analytics-body');
+
+  if (!serverUrl || !formId) {
+    status.className = 'config-status err';
+    status.textContent = 'Please enter both a server URL and a form ID.';
+    return;
+  }
+
+  status.className = 'config-status';
+  status.textContent = 'Loading…';
+  body.innerHTML = '<div class="loading-msg">Fetching data…</div>';
+  document.getElementById('export-btn').style.display = 'none';
+
+  try {
+    const r = await fetch(`${serverUrl}/analytics/${encodeURIComponent(formId)}`, {
+      signal: AbortSignal.timeout(12000),
+    });
+    const data = await r.json();
+    if (!data.ok) throw new Error(data.error || 'Server error');
+
+    currentData = data;
+    status.className = 'config-status ok';
+    status.textContent = `✓ Loaded ${data.total} response${data.total===1?'':'s'} for "${data.form.title}"`;
+    renderAnalytics(data);
+    if (data.total > 0) document.getElementById('export-btn').style.display = '';
+  } catch(e) {
+    status.className = 'config-status err';
+    status.textContent = '✗ ' + e.message;
+    body.innerHTML = `<div class="empty-state"><h2>Could not load data</h2><p>${esc(e.message)}</p></div>`;
+  }
+}
+
+function renderAnalytics(data) {
+  chartInstances.forEach(c => { try { c.destroy(); } catch(e){} });
+  chartInstances = [];
+
+  const { form, submissions, total } = data;
+
+  if (!total) {
+    document.getElementById('analytics-body').innerHTML =
+      `<div class="empty-state"><h2>No responses yet</h2><p>Share your form link and responses will appear here.</p></div>`;
+    return;
+  }
+
+  const first = new Date(submissions[0].submittedAt).toLocaleDateString();
+  const last  = new Date(submissions[total-1].submittedAt).toLocaleDateString();
+  const answered = q => submissions.filter(s => {
+    const v = s.answers?.[q.id];
+    return Array.isArray(v) ? v.length > 0 : !!v;
+  }).length;
+
+  document.getElementById('analytics-body').innerHTML = `
+    <div class="stats-row">
+      <div class="stat-card"><div class="stat-label">Total responses</div><div class="stat-value">${total}</div></div>
+      <div class="stat-card"><div class="stat-label">Questions</div><div class="stat-value">${form.questions.length}</div></div>
+      <div class="stat-card"><div class="stat-label">First response</div><div class="stat-value" style="font-size:17px">${first}</div></div>
+      <div class="stat-card"><div class="stat-label">Latest response</div><div class="stat-value" style="font-size:17px">${last}</div></div>
+    </div>
+    <div class="timeline-card">
+      <div class="section-title">Submissions over time</div>
+      <div class="timeline-wrap"><canvas id="timeline-canvas"></canvas></div>
+    </div>
+    <div class="questions-grid" id="q-grid"></div>
+    <div class="table-section">
+      <div class="section-title">All responses</div>
+      <div class="resp-table-wrap"><table class="resp-table" id="resp-table"></table></div>
+      <div class="export-row">
+        <button class="btn" onclick="exportXLSX()">Export all as XLSX</button>
+      </div>
+    </div>`;
+
+  renderTimeline(submissions);
+  renderCharts(form, submissions, answered);
+  renderTable(form, submissions);
+}
+
+/* ── Timeline chart ────────────────────────────────────────────────────────── */
+function renderTimeline(submissions) {
+  // Bucket by date
+  const counts = {};
+  submissions.forEach(s => {
+    const d = new Date(s.submittedAt).toLocaleDateString('en-CA'); // YYYY-MM-DD
+    counts[d] = (counts[d] || 0) + 1;
+  });
+  const labels = Object.keys(counts).sort();
+  const values = labels.map(l => counts[l]);
+
+  const ctx = document.getElementById('timeline-canvas').getContext('2d');
+  const chart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        data: values,
+        backgroundColor: 'rgba(42,92,69,0.15)',
+        borderColor: '#2a5c45',
+        borderWidth: 1.5,
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { title: t => t[0].label, label: t => `${t.parsed.y} submission${t.parsed.y===1?'':'s'}` }}},
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 11 }, color: '#a8a49e' }},
+        y: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 11 }, color: '#a8a49e' }, grid: { color: '#f0ede6' }},
+      }
+    }
+  });
+  chartInstances.push(chart);
+}
+
+/* ── Per-question charts ───────────────────────────────────────────────────── */
+function renderCharts(form, submissions, answered) {
+  const grid = document.getElementById('q-grid');
+  form.questions.forEach((q, qi) => {
+    const div = document.createElement('div');
+    div.className = 'q-analytics-card';
+    const typeLabel = {short:'Short answer',long:'Paragraph',radio:'Multiple choice',checkbox:'Checkboxes',dropdown:'Dropdown',email:'Email',number:'Number',date:'Date'}[q.type] || q.type;
+    const ans = answered(q);
+    div.innerHTML = `<div class="qa-title">${esc(q.label||`Question ${qi+1}`)}</div>
+      <div class="qa-meta">${typeLabel} · ${ans}/${submissions.length} answered</div>
+      <div id="chart-area-${q.id}"></div>`;
+    grid.appendChild(div);
+
+    const area = document.getElementById('chart-area-' + q.id);
+
+    if (['radio','checkbox','dropdown'].includes(q.type)) {
+      const tally = {};
+      submissions.forEach(s => {
+        const v = s.answers?.[q.id];
+        const vals = Array.isArray(v) ? v : (v ? [v] : []);
+        vals.forEach(val => { if(val) tally[val] = (tally[val]||0)+1; });
+      });
+      const labels = Object.keys(tally);
+      const values = Object.values(tally);
+      const total = values.reduce((a,b)=>a+b,0)||1;
+      if (!labels.length) { area.innerHTML = `<div class="no-answers">No answers yet.</div>`; return; }
+
+      const canvasId = 'cv-' + q.id;
+      area.innerHTML = `<div class="chart-wrap">
+        <canvas id="${canvasId}" width="150" height="150" style="flex-shrink:0"></canvas>
+        <div class="legend" id="leg-${q.id}"></div>
+      </div>`;
+      const ctx = document.getElementById(canvasId).getContext('2d');
+      const chart = new Chart(ctx, {
+        type: 'doughnut',
+        data: { labels, datasets: [{ data: values, backgroundColor: COLORS.slice(0,labels.length), borderWidth: 2, borderColor: '#fff' }]},
+        options: { responsive: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => `${c.label}: ${c.parsed} (${Math.round(c.parsed/total*100)}%)` }}}, cutout: '62%' }
+      });
+      chartInstances.push(chart);
+
+      const leg = document.getElementById('leg-' + q.id);
+      labels.forEach((lbl, i) => {
+        const pct = Math.round(values[i]/total*100);
+        const item = document.createElement('div');
+        item.className = 'legend-item';
+        item.innerHTML = `<div class="legend-dot" style="background:${COLORS[i%COLORS.length]}"></div>
+          <span class="legend-label">${esc(lbl)}</span>
+          <span class="legend-pct">${pct}%</span>`;
+        leg.appendChild(item);
+      });
+    } else {
+      const answers = submissions.map(s => {
+        const v = s.answers?.[q.id];
+        return Array.isArray(v) ? v.join(', ') : (v||'');
+      }).filter(Boolean);
+      if (!answers.length) { area.innerHTML = `<div class="no-answers">No answers yet.</div>`; return; }
+      area.innerHTML = `<div class="text-answers">${answers.slice().reverse().map(a => `<div class="text-answer">${esc(a)}</div>`).join('')}</div>`;
+    }
+  });
+}
+
+/* ── All responses table ───────────────────────────────────────────────────── */
+function renderTable(form, submissions) {
+  const table = document.getElementById('resp-table');
+  const headers = ['#', 'Submitted', ...form.questions.map((q,i) => q.label||`Q${i+1}`)];
+  const thead = headers.map(h => `<th>${esc(h)}</th>`).join('');
+  const rows = submissions.map((s, i) => {
+    const date = new Date(s.submittedAt).toLocaleString();
+    const cells = form.questions.map(q => {
+      const v = s.answers?.[q.id];
+      const str = Array.isArray(v) ? v.join(', ') : (v||'');
+      return `<td title="${esc(str)}">${esc(str)||`<span style="color:var(--text3)">—</span>`}</td>`;
+    }).join('');
+    return `<tr><td><span class="badge">${i+1}</span></td><td style="white-space:nowrap;color:var(--text2)">${date}</td>${cells}</tr>`;
+  }).join('');
+  table.innerHTML = `<thead><tr>${thead}</tr></thead><tbody>${rows}</tbody>`;
+}
+
+/* ── Export ────────────────────────────────────────────────────────────────── */
+function exportXLSX() {
+  if (!currentData) return;
+  const { form, submissions } = currentData;
+  const header = ['Submission #', 'Submitted At', ...form.questions.map((q,i) => q.label||`Question ${i+1}`)];
+  const rows = submissions.map((s, idx) => {
+    const date = new Date(s.submittedAt).toLocaleString();
+    return [idx+1, date, ...form.questions.map(q => {
+      const v = s.answers?.[q.id];
+      return Array.isArray(v) ? v.join(', ') : (v||'');
+    })];
+  });
+  const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+  ws['!cols'] = [{wch:14},{wch:22},...form.questions.map(()=>({wch:28}))];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Responses');
+  XLSX.writeFile(wb, (form.title||'responses').replace(/[^a-z0-9]/gi,'_')+'_responses.xlsx');
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Fill Form — FormDrop</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap" rel="stylesheet"/>
+<style>
+:root {
+  --bg: #f7f5f0;
+  --surface: #ffffff;
+  --surface2: #f0ede6;
+  --border: #e2ddd4;
+  --border2: #ccc7bc;
+  --text: #1a1916;
+  --text2: #6b6760;
+  --text3: #a8a49e;
+  --accent: #2a5c45;
+  --accent-light: #e8f2ed;
+  --danger: #c0392b;
+  --radius: 10px;
+  --radius-lg: 14px;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  font-size: 15px;
+}
+.topbar {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0 2rem;
+  height: 52px;
+  display: flex;
+  align-items: center;
+}
+.logo {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.logo-dot { width: 7px; height: 7px; background: var(--accent); border-radius: 50%; }
+.main { max-width: 640px; margin: 0 auto; padding: 2.5rem 1.5rem 5rem; }
+.form-header {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-top: 4px solid var(--accent);
+  border-radius: var(--radius-lg);
+  padding: 1.75rem 1.75rem 1.5rem;
+  margin-bottom: 16px;
+}
+.form-title { font-size: 26px; font-weight: 600; letter-spacing: -0.4px; margin-bottom: 8px; line-height: 1.2; }
+.form-desc { font-size: 14px; color: var(--text2); line-height: 1.6; }
+.required-note { font-size: 12px; color: var(--text2); margin-bottom: 16px; }
+.required-note span { color: var(--danger); }
+.q-fields { display: flex; flex-direction: column; gap: 12px; }
+.q-field {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem 1.5rem;
+  transition: border-color 0.15s;
+}
+.q-field.has-error { border-color: var(--danger); }
+.q-label { font-size: 14.5px; font-weight: 500; margin-bottom: 10px; line-height: 1.4; display: flex; align-items: flex-start; gap: 4px; }
+.q-label .req { color: var(--danger); flex-shrink: 0; }
+.error-msg { font-size: 12px; color: var(--danger); margin-top: 6px; display: none; }
+.has-error .error-msg { display: block; }
+.q-field input[type=text],
+.q-field input[type=email],
+.q-field input[type=number],
+.q-field input[type=date],
+.q-field textarea,
+.q-field select {
+  width: 100%;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14.5px;
+  padding: 10px 13px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.q-field input:focus, .q-field textarea:focus, .q-field select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(42,92,69,0.1);
+}
+.q-field textarea { resize: vertical; min-height: 100px; }
+.q-options { display: flex; flex-direction: column; gap: 9px; }
+.q-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14.5px;
+  cursor: pointer;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  transition: border-color 0.15s, background 0.15s;
+  user-select: none;
+}
+.q-option:hover { border-color: var(--border2); background: var(--surface); }
+.q-option input { cursor: pointer; accent-color: var(--accent); width: 16px; height: 16px; flex-shrink: 0; }
+.q-option.selected { border-color: var(--accent); background: var(--accent-light); }
+.submit-row { margin-top: 1.5rem; display: flex; align-items: center; gap: 14px; }
+.submit-btn {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  padding: 12px 34px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+}
+.submit-btn:hover { background: #1d3f2f; }
+.submit-btn:active { transform: scale(0.98); }
+.submit-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+.clear-btn {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13.5px;
+  color: var(--text2);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+}
+.clear-btn:hover { color: var(--text); text-decoration: underline; }
+.success-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-top: 4px solid var(--accent);
+  border-radius: var(--radius-lg);
+  padding: 3rem 2rem;
+  text-align: center;
+  display: none;
+}
+.success-card.show { display: block; }
+.success-icon {
+  width: 56px; height: 56px;
+  background: var(--accent-light);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 1.25rem;
+}
+.success-title { font-size: 22px; font-weight: 600; margin-bottom: 8px; }
+.success-sub { font-size: 14px; color: var(--text2); line-height: 1.6; margin-bottom: 1.5rem; }
+.another-btn {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 9px 22px;
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.another-btn:hover { background: var(--surface2); }
+.loading-state { text-align: center; padding: 4rem 1.5rem; color: var(--text2); font-size: 14px; }
+.error-page { text-align: center; padding: 4rem 1.5rem; }
+.error-page h1 { font-size: 22px; font-weight: 600; margin-bottom: 10px; }
+.error-page p { font-size: 14px; color: var(--text2); line-height: 1.6; }
+@media (max-width: 600px) {
+  .main { padding: 1.5rem 1rem 4rem; }
+  .form-header { padding: 1.25rem; }
+  .q-field { padding: 1rem 1.1rem; }
+  .form-title { font-size: 21px; }
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">
+    <div class="logo-dot"></div>
+    FormDrop
+  </div>
+</div>
+
+<div class="main" id="main-wrap">
+  <div class="loading-state">Loading form…</div>
+</div>
+
+<script>
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+const params = new URLSearchParams(window.location.search);
+const formId = params.get('id');
+const encodedF = params.get('f'); // legacy fallback
+
+const wrap = document.getElementById('main-wrap');
+
+// Server URL comes from the share link (?s=...) — works on any device.
+// Falls back to localStorage for the builder's own device.
+function getServerUrl() {
+  const p = new URLSearchParams(window.location.search);
+  const fromUrl = p.get('s');
+  if (fromUrl) return fromUrl.trim().replace(/\/$/, '');
+  return (localStorage.getItem('fd_server_url') || '').trim().replace(/\/$/, '');
+}
+
+async function loadForm() {
+  // New: load by ID from server
+  if (formId) {
+    const serverUrl = getServerUrl();
+    if (!serverUrl) {
+      showError(
+        'Cannot load form',
+        'The share link is missing a server address. Re-copy the link from the builder — it should contain a "?s=" parameter.'
+      );
+      return;
+    }
+    try {
+      const r = await fetch(serverUrl + '/forms/' + encodeURIComponent(formId), {
+        signal: AbortSignal.timeout(10000),
+      });
+      if (!r.ok) throw new Error('Form not found (status ' + r.status + ')');
+      const data = await r.json();
+      if (!data.ok || !data.form) throw new Error(data.error || 'Invalid response');
+      renderForm(data.form);
+    } catch(e) {
+      showError('Could not load form', e.message + '. Make sure your server is running and accessible.');
+    }
+    return;
+  }
+
+  // Legacy fallback: form encoded in URL
+  if (encodedF) {
+    try {
+      const data = JSON.parse(decodeURIComponent(escape(atob(encodedF))));
+      renderForm(data);
+    } catch(e) {
+      showError('Invalid form link', 'This link doesn\'t contain a valid form. Check that you copied the full URL.');
+    }
+    return;
+  }
+
+  showError('No form found', 'This link doesn\'t contain a valid form ID. Check that you copied the full URL.');
+}
+
+function showError(title, msg) {
+  wrap.innerHTML = `<div class="error-page"><h1>${esc(title)}</h1><p>${esc(msg)}</p></div>`;
+}
+
+let currentFormData = null;
+
+function renderForm(data) {
+  currentFormData = data;
+  document.title = (data.title || 'Form') + ' — FormDrop';
+  const hasRequired = data.questions.some(q => q.required);
+
+  const fields = data.questions.map((q, i) => {
+    const req = q.required ? `<span class="req">*</span>` : '';
+    const lbl = q.label || `Question ${i+1}`;
+    let inp = '';
+
+    if (q.type === 'short') inp = `<input type="text" id="ans-${q.id}" placeholder="Your answer"/>`;
+    else if (q.type === 'email') inp = `<input type="email" id="ans-${q.id}" placeholder="your@email.com"/>`;
+    else if (q.type === 'number') inp = `<input type="number" id="ans-${q.id}" placeholder="0"/>`;
+    else if (q.type === 'date') inp = `<input type="date" id="ans-${q.id}"/>`;
+    else if (q.type === 'long') inp = `<textarea id="ans-${q.id}" placeholder="Your answer"></textarea>`;
+    else if (q.type === 'radio') {
+      inp = `<div class="q-options" id="ans-${q.id}">${(q.options||[]).map(o =>
+        `<label class="q-option" onclick="selectOpt(this,'${q.id}','radio')">
+          <input type="radio" name="${q.id}" value="${esc(o)}"> ${esc(o)}
+        </label>`).join('')}</div>`;
+    } else if (q.type === 'checkbox') {
+      inp = `<div class="q-options" id="ans-${q.id}">${(q.options||[]).map((o, oi) =>
+        `<label class="q-option" onclick="toggleOpt(this)">
+          <input type="checkbox" name="${q.id}-${oi}" value="${esc(o)}"> ${esc(o)}
+        </label>`).join('')}</div>`;
+    } else if (q.type === 'dropdown') {
+      inp = `<select id="ans-${q.id}"><option value="">Choose an option</option>${(q.options||[]).map(o=>`<option value="${esc(o)}">${esc(o)}</option>`).join('')}</select>`;
+    }
+
+    return `<div class="q-field" id="field-${q.id}" data-id="${q.id}" data-type="${q.type}" data-required="${q.required}">
+      <div class="q-label">${esc(lbl)}${req}</div>
+      ${inp}
+      <div class="error-msg">This field is required.</div>
+    </div>`;
+  }).join('');
+
+  wrap.innerHTML = `
+    <div class="form-header">
+      <div class="form-title">${esc(data.title || 'My Form')}</div>
+      ${data.desc ? `<div class="form-desc">${esc(data.desc)}</div>` : ''}
+    </div>
+    ${hasRequired ? `<p class="required-note"><span>*</span> Required</p>` : ''}
+    <div class="q-fields">${fields}</div>
+    <div class="submit-row">
+      <button class="submit-btn" id="submit-btn" onclick="submitForm()">Submit</button>
+      <button class="clear-btn" onclick="clearForm()">Clear form</button>
+    </div>
+    <div id="submit-error" style="display:none;margin-top:10px;font-size:13px;color:var(--danger);background:#fdf0ee;border-radius:8px;padding:10px 14px;"></div>
+    <div class="success-card" id="success-card">
+      <div class="success-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2a5c45" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+      </div>
+      <div class="success-title">Response submitted!</div>
+      <div class="success-sub">Your response has been recorded.<br>Thank you for filling out this form.</div>
+      <button class="another-btn" onclick="resetForm()">Submit another response</button>
+    </div>`;
+}
+
+function selectOpt(lbl, qid) {
+  const w = document.getElementById('ans-' + qid);
+  if (!w) return;
+  w.querySelectorAll('.q-option').forEach(el => el.classList.remove('selected'));
+  lbl.classList.add('selected');
+}
+
+function toggleOpt(lbl) {
+  const cb = lbl.querySelector('input[type=checkbox]');
+  setTimeout(() => lbl.classList.toggle('selected', cb.checked), 0);
+}
+
+function getValue(q) {
+  if (['short','email','number','date','long','dropdown'].includes(q.type)) {
+    const el = document.getElementById('ans-' + q.id);
+    return el ? el.value.trim() : '';
+  } else if (q.type === 'radio') {
+    const el = document.getElementById('ans-' + q.id);
+    if (!el) return '';
+    const checked = el.querySelector('input[type=radio]:checked');
+    return checked ? checked.value : '';
+  } else if (q.type === 'checkbox') {
+    const el = document.getElementById('ans-' + q.id);
+    if (!el) return [];
+    return Array.from(el.querySelectorAll('input[type=checkbox]:checked')).map(c => c.value);
+  }
+  return '';
+}
+
+async function submitForm() {
+  const data = currentFormData;
+  if (!data) return;
+  let valid = true;
+
+  data.questions.forEach(q => {
+    const field = document.getElementById('field-' + q.id);
+    if (!field) return;
+    field.classList.remove('has-error');
+    if (q.required) {
+      const v = getValue(q);
+      const empty = Array.isArray(v) ? v.length === 0 : v === '';
+      if (empty) { field.classList.add('has-error'); valid = false; }
+    }
+  });
+
+  if (!valid) {
+    const firstErr = document.querySelector('.has-error');
+    if (firstErr) firstErr.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
+
+  // Collect answers
+  const answers = {};
+  data.questions.forEach(q => { answers[q.id] = getValue(q); });
+
+  // Try to post to server
+  const serverUrl = getServerUrl();
+  const btn = document.getElementById('submit-btn');
+
+  if (!serverUrl) {
+    // No server — just show success locally (no data saved)
+    showSuccessState();
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Submitting…';
+
+  if (serverUrl) {
+    try {
+      const r = await fetch(serverUrl + '/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          formId: data.id || formId,
+          formTitle: data.title,
+          questions: data.questions,
+          answers,
+        }),
+        signal: AbortSignal.timeout(15000),
+      });
+      const j = await r.json();
+      if (!j.ok) throw new Error(j.error || 'Server error');
+    } catch(e) {
+      btn.disabled = false;
+      btn.textContent = 'Submit';
+      // Show a friendly inline error instead of a browser alert
+      const errDiv = document.getElementById('submit-error');
+      if (errDiv) {
+        errDiv.textContent = 'Submission failed: ' + e.message + '. Please try again.';
+        errDiv.style.display = 'block';
+      }
+      return;
+    }
+  }
+
+  showSuccessState();
+}
+
+function showSuccessState() {
+  document.querySelector('.q-fields').style.display = 'none';
+  document.querySelector('.submit-row').style.display = 'none';
+  const errDiv = document.getElementById('submit-error');
+  if (errDiv) errDiv.style.display = 'none';
+  const req = document.querySelector('.required-note');
+  if (req) req.style.display = 'none';
+  document.getElementById('success-card').classList.add('show');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function clearForm() {
+  const data = currentFormData;
+  if (!data) return;
+  data.questions.forEach(q => {
+    const field = document.getElementById('field-' + q.id);
+    if (field) field.classList.remove('has-error');
+    if (['short','email','number','date','long','dropdown'].includes(q.type)) {
+      const el = document.getElementById('ans-' + q.id);
+      if (el) el.value = '';
+    } else {
+      const el = document.getElementById('ans-' + q.id);
+      if (el) {
+        el.querySelectorAll('input').forEach(i => i.checked = false);
+        el.querySelectorAll('.q-option').forEach(o => o.classList.remove('selected'));
+      }
+    }
+  });
+}
+
+function resetForm() {
+  document.querySelector('.q-fields').style.display = '';
+  document.querySelector('.submit-row').style.display = '';
+  const req = document.querySelector('.required-note');
+  if (req) req.style.display = '';
+  document.getElementById('success-card').classList.remove('show');
+  const errDiv = document.getElementById('submit-error');
+  if (errDiv) errDiv.style.display = 'none';
+  const btn = document.getElementById('submit-btn');
+  if (btn) { btn.disabled = false; btn.textContent = 'Submit'; }
+  clearForm();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// Kick off
+loadForm();
+</script>
+</body>
+</html>

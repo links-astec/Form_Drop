@@ -1,0 +1,1101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Form Builder — FormDrop</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+:root {
+  --bg: #f7f5f0;
+  --surface: #ffffff;
+  --surface2: #f0ede6;
+  --border: #e2ddd4;
+  --border2: #ccc7bc;
+  --text: #1a1916;
+  --text2: #6b6760;
+  --text3: #a8a49e;
+  --accent: #2a5c45;
+  --accent-light: #e8f2ed;
+  --accent-text: #1d3f2f;
+  --danger: #c0392b;
+  --danger-light: #fdf0ee;
+  --radius: 10px;
+  --radius-lg: 14px;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  font-size: 15px;
+}
+a { color: var(--accent); }
+
+/* HEADER */
+header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 58px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.logo {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.logo-dot { width: 8px; height: 8px; background: var(--accent); border-radius: 50%; }
+.header-actions { display: flex; gap: 8px; align-items: center; }
+.btn {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13.5px;
+  font-weight: 500;
+  padding: 7px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border2);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.btn:hover { background: var(--surface2); }
+.btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.btn-primary:hover { background: #1d3f2f; border-color: #1d3f2f; }
+.btn-danger { color: var(--danger); border-color: var(--danger); }
+.btn-danger:hover { background: var(--danger-light); }
+
+/* LAYOUT */
+.main { max-width: 780px; margin: 0 auto; padding: 2rem 1.5rem 5rem; }
+
+/* TABS */
+.tabs {
+  display: flex;
+  gap: 2px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 3px;
+  margin-bottom: 2rem;
+  width: fit-content;
+}
+.tab-btn {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13.5px;
+  font-weight: 500;
+  padding: 7px 20px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text2);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.tab-btn.active {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+
+/* SECTION */
+.section { display: none; }
+.section.active { display: block; }
+
+/* FORM META */
+.form-title-wrap { margin-bottom: 1.5rem; }
+.form-title-input {
+  width: 100%;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.5px;
+  border: none;
+  border-bottom: 2px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  padding: 4px 0 8px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.form-title-input:focus { border-bottom-color: var(--accent); }
+.form-title-input::placeholder { color: var(--text3); }
+.form-desc-input {
+  width: 100%;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  border: none;
+  background: transparent;
+  color: var(--text2);
+  padding: 6px 0 2px;
+  outline: none;
+  resize: none;
+  min-height: 30px;
+}
+.form-desc-input::placeholder { color: var(--text3); }
+
+/* QUESTION CARDS */
+.questions { display: flex; flex-direction: column; gap: 10px; margin-bottom: 1.5rem; }
+.q-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.1rem 1.25rem;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.q-card:hover { border-color: var(--border2); }
+.q-card.focused { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(42,92,69,0.08); }
+.q-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.q-num { font-size: 11px; font-weight: 600; color: var(--text3); min-width: 18px; letter-spacing: 0.5px; }
+.q-type-select {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface2);
+  color: var(--text2);
+  cursor: pointer;
+  outline: none;
+}
+.q-type-select:focus { border-color: var(--accent); }
+.q-required-toggle {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--text2);
+  cursor: pointer;
+  user-select: none;
+  margin-left: auto;
+}
+.q-required-toggle input { cursor: pointer; accent-color: var(--accent); }
+.q-delete {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text3);
+  font-size: 18px;
+  line-height: 1;
+  padding: 0 2px;
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+}
+.q-delete:hover { color: var(--danger); background: var(--danger-light); }
+.q-label-input {
+  width: 100%;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 15px;
+  font-weight: 500;
+  border: none;
+  border-bottom: 1px solid transparent;
+  background: transparent;
+  color: var(--text);
+  outline: none;
+  padding: 2px 0;
+  transition: border-color 0.15s;
+}
+.q-label-input:focus { border-bottom-color: var(--border2); }
+.q-label-input::placeholder { color: var(--text3); font-weight: 400; }
+
+/* OPTIONS */
+.options { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; }
+.opt-row { display: flex; align-items: center; gap: 8px; }
+.opt-icon { width: 15px; height: 15px; flex-shrink: 0; border: 1.5px solid var(--border2); border-radius: 50%; }
+.opt-icon.sq { border-radius: 3px; }
+.opt-input {
+  flex: 1;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  border: none;
+  border-bottom: 1px solid transparent;
+  background: transparent;
+  color: var(--text);
+  outline: none;
+  padding: 2px 0;
+}
+.opt-input:focus { border-bottom-color: var(--border); }
+.opt-input::placeholder { color: var(--text3); }
+.opt-del {
+  background: none; border: none; cursor: pointer;
+  color: var(--text3); font-size: 15px; padding: 0 2px;
+  border-radius: 3px; line-height: 1;
+}
+.opt-del:hover { color: var(--danger); }
+.add-opt-btn {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  color: var(--text2);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 3px 0;
+  text-align: left;
+}
+.add-opt-btn:hover { color: var(--accent); }
+
+/* ADD QUESTION BAR */
+.add-q-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 1.25rem;
+  background: var(--surface);
+  border: 1px dashed var(--border2);
+  border-radius: var(--radius-lg);
+}
+.add-q-bar span {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text3);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  width: 100%;
+  margin-bottom: 2px;
+}
+.add-q-type {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface2);
+  color: var(--text2);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.add-q-type:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-light); }
+
+/* EMPTY STATE */
+.empty {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: var(--text3);
+  font-size: 14px;
+}
+.empty svg { margin-bottom: 12px; opacity: 0.4; }
+
+/* SHARE SECTION */
+.share-grid { display: flex; flex-direction: column; gap: 16px; }
+.share-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+}
+.share-card-title { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+.share-card-desc { font-size: 13px; color: var(--text2); margin-bottom: 14px; line-height: 1.5; }
+.link-row { display: flex; gap: 8px; }
+.link-box {
+  flex: 1;
+  font-family: 'DM Mono', monospace;
+  font-size: 12px;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface2);
+  color: var(--text2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: text;
+  user-select: all;
+}
+.qr-area { display: flex; gap: 2rem; align-items: flex-start; flex-wrap: wrap; }
+#qr-output {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 160px;
+  min-height: 160px;
+}
+#qr-output canvas, #qr-output img { display: block; border-radius: 4px; }
+.qr-info { flex: 1; min-width: 200px; }
+.qr-info p { font-size: 13px; color: var(--text2); margin-bottom: 12px; line-height: 1.6; }
+.qr-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* UUID badge */
+.uuid-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  color: var(--text3);
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 10px;
+  margin-bottom: 14px;
+}
+
+/* SAVE STATUS */
+.save-status {
+  font-size: 12.5px;
+  padding: 8px 12px;
+  border-radius: 7px;
+  margin-top: 10px;
+  display: none;
+}
+.save-status.ok { background: var(--accent-light); color: var(--accent-text); display: block; }
+.save-status.warn { background: #fdf0ee; color: var(--danger); display: block; }
+.save-status.info { background: var(--surface2); color: var(--text2); display: block; }
+
+/* PREVIEW */
+.preview-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
+.preview-bar {
+  background: var(--surface2);
+  border-bottom: 1px solid var(--border);
+  padding: 10px 16px;
+  font-size: 12px;
+  color: var(--text2);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.preview-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border2); }
+.preview-inner { padding: 2rem; }
+.pv-title { font-size: 22px; font-weight: 600; letter-spacing: -0.3px; margin-bottom: 6px; }
+.pv-desc { font-size: 14px; color: var(--text2); margin-bottom: 2rem; }
+.pv-fields { display: flex; flex-direction: column; gap: 1.5rem; }
+.pv-field label { display: block; font-size: 14px; font-weight: 500; margin-bottom: 7px; }
+.pv-field .req { color: var(--danger); margin-left: 2px; }
+.pv-field input[type=text],
+.pv-field input[type=email],
+.pv-field input[type=number],
+.pv-field input[type=date],
+.pv-field textarea,
+.pv-field select {
+  width: 100%;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  outline: none;
+}
+.pv-field textarea { resize: vertical; min-height: 90px; }
+.pv-options { display: flex; flex-direction: column; gap: 8px; }
+.pv-option { display: flex; align-items: center; gap: 9px; font-size: 14px; cursor: pointer; }
+.pv-option input { cursor: pointer; accent-color: var(--accent); }
+.pv-submit {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 11px 28px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 9px;
+  cursor: pointer;
+  margin-top: 8px;
+}
+
+/* EMAIL CONFIG */
+.email-config-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  margin-bottom: 16px;
+}
+.email-config-title { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+.email-config-desc { font-size: 13px; color: var(--text2); margin-bottom: 1.25rem; line-height: 1.55; }
+.email-config-desc a { color: var(--accent); }
+.email-field { margin-bottom: 14px; }
+.email-label { font-size: 12.5px; font-weight: 500; color: var(--text2); margin-bottom: 5px; display: block; }
+.email-input {
+  width: 100%; font-family: 'DM Sans', sans-serif; font-size: 14px;
+  padding: 9px 12px; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--bg); color: var(--text); outline: none;
+  transition: border-color 0.15s;
+}
+.email-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(42,92,69,0.08); }
+.email-input::placeholder { color: var(--text3); }
+.email-hint { font-size: 11.5px; color: var(--text3); margin-top: 4px; line-height: 1.4; }
+.email-status {
+  font-size: 12.5px; padding: 8px 12px; border-radius: 7px;
+  margin-top: 10px; display: none;
+}
+.email-status.ok { background: var(--accent-light); color: var(--accent-text); display: block; }
+.email-status.warn { background: #fdf0ee; color: var(--danger); display: block; }
+.steps-list { counter-reset: step; display: flex; flex-direction: column; gap: 10px; margin-bottom: 1.25rem; }
+.step { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; color: var(--text2); line-height: 1.5; }
+.step-num { min-width: 22px; height: 22px; background: var(--surface2); border: 1px solid var(--border); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; color: var(--text); flex-shrink: 0; margin-top: 1px; }
+
+/* TOAST */
+.toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(10px);
+  background: var(--text);
+  color: var(--surface);
+  padding: 9px 22px;
+  border-radius: 30px;
+  font-size: 13.5px;
+  font-weight: 500;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s, transform 0.25s;
+  z-index: 999;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* PRINT STYLES — blank paper form */
+@media print {
+  header, .tabs, .header-actions, .add-q-bar,
+  .share-grid, .email-config-card, .steps-list,
+  .toast, #sec-email, #sec-share,
+  .q-top, .q-delete, .q-type-select, .q-required-toggle,
+  .preview-bar, .pv-submit { display: none !important; }
+
+  body { background: #fff; font-size: 13pt; color: #000; }
+  .main { max-width: 100%; padding: 0; margin: 0; }
+
+  /* Show only the build section as the printable form */
+  #sec-build { display: block !important; }
+  #sec-preview, #sec-share, #sec-email { display: none !important; }
+
+  .form-title-wrap { margin-bottom: 1.5rem; border-bottom: 2px solid #000; padding-bottom: 0.75rem; }
+  .form-title-input {
+    font-size: 22pt;
+    font-weight: 700;
+    border: none;
+    padding: 0;
+    pointer-events: none;
+  }
+  .form-desc-input { font-size: 11pt; color: #444; pointer-events: none; }
+
+  .questions { gap: 18pt; }
+  .q-card {
+    border: none;
+    border-bottom: 1px solid #ddd;
+    border-radius: 0;
+    padding: 0 0 14pt 0;
+    page-break-inside: avoid;
+    box-shadow: none !important;
+  }
+  .q-label-input {
+    font-size: 12pt;
+    font-weight: 600;
+    border: none;
+    pointer-events: none;
+    padding: 0 0 6pt 0;
+    display: block;
+  }
+
+  /* Write-on lines for text answers */
+  .print-answer-line {
+    display: block;
+    border-bottom: 1px solid #aaa;
+    width: 100%;
+    height: 28pt;
+    margin-top: 4pt;
+  }
+  .print-answer-box {
+    display: block;
+    border: 1px solid #aaa;
+    width: 100%;
+    height: 64pt;
+    margin-top: 4pt;
+    border-radius: 3pt;
+  }
+
+  /* Options for radio/checkbox */
+  .print-options { margin-top: 6pt; display: flex; flex-direction: column; gap: 7pt; }
+  .print-option { display: flex; align-items: center; gap: 8pt; font-size: 11pt; }
+  .print-option-circle {
+    width: 14pt; height: 14pt;
+    border: 1.5pt solid #555;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .print-option-square {
+    width: 13pt; height: 13pt;
+    border: 1.5pt solid #555;
+    border-radius: 2pt;
+    flex-shrink: 0;
+  }
+  .print-option-label { font-size: 11pt; }
+
+  /* Dropdown: show as list of options */
+  .print-dropdown-opts { margin-top: 4pt; font-size: 11pt; color: #444; }
+}
+
+@media (max-width: 600px) {
+  .main { padding: 1.25rem 1rem 4rem; }
+  header { padding: 0 1rem; }
+  .form-title-input { font-size: 20px; }
+  .qr-area { flex-direction: column; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-dot"></div>
+    FormDrop
+  </div>
+  <div class="header-actions">
+    <button class="btn" onclick="printForm()" title="Export as printable PDF">🖨 Print form</button>
+    <button class="btn" onclick="switchTab('preview')">Preview</button>
+    <button class="btn btn-primary" onclick="switchTab('share')">Share →</button>
+  </div>
+</header>
+
+<div class="main">
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('build')">Build</button>
+    <button class="tab-btn" onclick="switchTab('email')">Email alerts</button>
+    <button class="tab-btn" onclick="switchTab('share')">Share & QR</button>
+    <button class="tab-btn" onclick="switchTab('preview')">Preview</button>
+  </div>
+
+  <!-- BUILD -->
+  <div id="sec-build" class="section active">
+    <div class="form-title-wrap">
+      <input class="form-title-input" id="form-title" type="text" placeholder="Untitled form" value="My Form"/>
+      <textarea class="form-desc-input" id="form-desc" placeholder="Add a description (optional)" rows="1"></textarea>
+    </div>
+    <div class="questions" id="questions-list"></div>
+    <div class="add-q-bar">
+      <span>Add question</span>
+      <button class="add-q-type" onclick="addQ('short')">Short answer</button>
+      <button class="add-q-type" onclick="addQ('long')">Long answer</button>
+      <button class="add-q-type" onclick="addQ('radio')">Multiple choice</button>
+      <button class="add-q-type" onclick="addQ('checkbox')">Checkboxes</button>
+      <button class="add-q-type" onclick="addQ('dropdown')">Dropdown</button>
+      <button class="add-q-type" onclick="addQ('email')">Email</button>
+      <button class="add-q-type" onclick="addQ('number')">Number</button>
+      <button class="add-q-type" onclick="addQ('date')">Date</button>
+    </div>
+  </div>
+
+  <!-- EMAIL ALERTS -->
+  <div id="sec-email" class="section">
+    <div class="email-config-card">
+      <div class="email-config-title">📧 Email alerts + Excel attachment</div>
+      <div class="email-config-desc">
+        Every time someone submits your form, your server will email you a formatted summary with an <strong>.xlsx</strong> attachment containing <em>all</em> responses.<br>
+        Deploy the included <code style="font-size:12px;background:var(--surface2);padding:1px 5px;border-radius:4px">formdrop-server</code> and paste its URL below.
+      </div>
+      <div class="steps-list">
+        <div class="step"><div class="step-num">1</div><span>Deploy your server to <a href="https://vercel.com" target="_blank">Vercel</a>, <a href="https://railway.app" target="_blank">Railway</a>, or <a href="https://render.com" target="_blank">Render</a></span></div>
+        <div class="step"><div class="step-num">2</div><span>Set <code style="font-size:12px;background:var(--surface2);padding:1px 4px;border-radius:3px">SMTP_USER</code>, <code style="font-size:12px;background:var(--surface2);padding:1px 4px;border-radius:3px">SMTP_PASS</code>, <code style="font-size:12px;background:var(--surface2);padding:1px 4px;border-radius:3px">TO_EMAIL</code>, and <code style="font-size:12px;background:var(--surface2);padding:1px 4px;border-radius:3px">DATABASE_URL</code> in your environment variables</span></div>
+        <div class="step"><div class="step-num">3</div><span>Get a Google App Password at <a href="https://myaccount.google.com/apppasswords" target="_blank">myaccount.google.com/apppasswords</a></span></div>
+        <div class="step"><div class="step-num">4</div><span>Paste the deployed URL below, then go to Share & QR to publish your form</span></div>
+      </div>
+      <div class="email-field">
+        <label class="email-label">Server URL</label>
+        <input class="email-input" id="cfg-server-url" type="url" placeholder="https://my-formdrop.vercel.app/api" oninput="updateEmailStatus(); saveConfig();"/>
+        <div class="email-hint">The base API URL of your deployed server — no trailing slash. For Vercel: include /api at the end.</div>
+      </div>
+      <div class="email-status" id="email-status"></div>
+      <button class="btn" id="test-btn" onclick="testConnection()" style="margin-top:12px;display:none">Test connection</button>
+    </div>
+    <div style="font-size:12.5px;color:var(--text3);line-height:1.6;padding:0 2px;">
+      ℹ The server URL is saved locally and embedded in share links. All credentials stay on your server — never in the browser.<br>
+      Responses are stored in your database. Analytics pulls from the server.
+    </div>
+  </div>
+
+  <!-- SHARE -->
+  <div id="sec-share" class="section">
+    <div class="share-grid">
+      <div class="share-card">
+        <div class="share-card-title">Shareable link</div>
+        <div class="share-card-desc">Send this link to anyone — they open and fill your form in their browser. Your form is saved by ID on the server.</div>
+        <div class="uuid-badge" id="uuid-badge">Form ID: —</div>
+        <div class="link-row">
+          <div class="link-box" id="share-link-display">—</div>
+          <button class="btn btn-primary" onclick="saveAndCopyLink()">Save & Copy</button>
+        </div>
+        <div class="save-status" id="save-status"></div>
+        <p style="margin-top:10px;font-size:12px;color:var(--text3);">
+          ℹ The link is short and stable. Edit your form anytime — the same link always works. Configure your server URL in Email alerts first.
+        </p>
+        <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
+          <label style="font-size:12px;color:var(--text2);white-space:nowrap">Fill page URL:</label>
+          <input id="fill-base-url" type="text" value="" placeholder="e.g. https://mysite.com/fill.html"
+            style="flex:1;font-family:'DM Mono',monospace;font-size:12px;padding:7px 10px;border:1px solid var(--border);border-radius:7px;background:var(--surface2);color:var(--text);outline:none;"
+            oninput="refreshShare()"/>
+        </div>
+      </div>
+      <div class="share-card">
+        <div class="share-card-title">QR code</div>
+        <div class="share-card-desc">Because the link is short, this QR code is small, clean, and scans instantly from any distance.</div>
+        <div class="qr-area">
+          <div id="qr-output"><span style="font-size:12px;color:var(--text3)">Save form first…</span></div>
+          <div class="qr-info">
+            <p>Works great for posters, event check-ins, paper handouts, or anywhere people can't easily type a URL.</p>
+            <div class="qr-actions">
+              <button class="btn" onclick="downloadQR()">Download PNG</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PREVIEW -->
+  <div id="sec-preview" class="section">
+    <div class="preview-wrap">
+      <div class="preview-bar">
+        <div class="preview-dot"></div>
+        <div class="preview-dot"></div>
+        <div class="preview-dot"></div>
+        <span style="margin-left:4px">fill.html — form preview</span>
+      </div>
+      <div class="preview-inner">
+        <div id="preview-content"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+   STATE
+   ============================================================ */
+let qs = [];
+let qIdx = 0;
+
+// UUID: persist across sessions so the same form always has the same ID
+function getOrCreateFormId() {
+  let id = localStorage.getItem('fd_form_uuid');
+  if (!id) {
+    // crypto.randomUUID is available in all modern browsers
+    id = (typeof crypto !== 'undefined' && crypto.randomUUID)
+      ? crypto.randomUUID()
+      : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+          const r = Math.random() * 16 | 0;
+          return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+        });
+    localStorage.setItem('fd_form_uuid', id);
+  }
+  return id;
+}
+
+const FORM_ID = getOrCreateFormId();
+
+// Restore server URL from localStorage
+window.addEventListener('DOMContentLoaded', () => {
+  const savedUrl = localStorage.getItem('fd_server_url') || '';
+  const el = document.getElementById('cfg-server-url');
+  if (el && savedUrl) { el.value = savedUrl; updateEmailStatus(); }
+  document.getElementById('uuid-badge').textContent = 'Form ID: ' + FORM_ID;
+  renderBuild();
+});
+
+/* ============================================================
+   QUESTION CRUD
+   ============================================================ */
+function uid() { return 'q' + (++qIdx); }
+
+function addQ(type) {
+  const q = { id: uid(), type, label: '', required: false };
+  if (['radio','checkbox','dropdown'].includes(type)) q.options = ['Option 1', 'Option 2'];
+  qs.push(q);
+  renderBuild();
+  setTimeout(() => {
+    const el = document.querySelector(`#card-${q.id} .q-label-input`);
+    if (el) el.focus();
+  }, 50);
+}
+
+function removeQ(id) { qs = qs.filter(q => q.id !== id); renderBuild(); }
+function setLabel(id, v) { const q = qs.find(q => q.id === id); if (q) q.label = v; }
+function setRequired(id, v) { const q = qs.find(q => q.id === id); if (q) q.required = v; }
+function setType(id, t) {
+  const q = qs.find(q => q.id === id); if (!q) return;
+  q.type = t;
+  if (['radio','checkbox','dropdown'].includes(t)) { if (!q.options) q.options = ['Option 1', 'Option 2']; }
+  else delete q.options;
+  renderBuild();
+}
+function setOption(id, i, v) { const q = qs.find(q => q.id === id); if (q && q.options) q.options[i] = v; }
+function addOption(id) { const q = qs.find(q => q.id === id); if (q && q.options) { q.options.push('Option ' + (q.options.length + 1)); renderBuild(); }}
+function removeOption(id, i) { const q = qs.find(q => q.id === id); if (q && q.options && q.options.length > 1) { q.options.splice(i, 1); renderBuild(); }}
+
+function esc(s) { return String(s || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function typeLabel(t) {
+  return {short:'Short answer',long:'Paragraph',radio:'Multiple choice',checkbox:'Checkboxes',dropdown:'Dropdown',email:'Email',number:'Number',date:'Date'}[t] || t;
+}
+
+function renderBuild() {
+  const el = document.getElementById('questions-list');
+  if (!qs.length) {
+    el.innerHTML = `<div class="empty"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="3"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="16" x2="12" y2="16"/></svg><br>No questions yet — use the buttons below to add some.</div>`;
+    return;
+  }
+  el.innerHTML = qs.map((q, i) => {
+    const hasOpts = q.options !== undefined;
+    const optIco = q.type === 'checkbox' ? 'sq' : '';
+    const optsHtml = hasOpts ? `
+      <div class="options">
+        ${q.options.map((o, oi) => `
+          <div class="opt-row">
+            <div class="opt-icon ${optIco}"></div>
+            <input class="opt-input" value="${esc(o)}" placeholder="Option ${oi+1}"
+              onchange="setOption('${q.id}',${oi},this.value)"/>
+            ${q.options.length > 1 ? `<button class="opt-del" onclick="removeOption('${q.id}',${oi})">×</button>` : ''}
+          </div>`).join('')}
+        <button class="add-opt-btn" onclick="addOption('${q.id}')">+ Add option</button>
+      </div>` : '';
+
+    const typeSel = ['short','long','radio','checkbox','dropdown','email','number','date']
+      .map(t => `<option value="${t}"${q.type===t?' selected':''}>${typeLabel(t)}</option>`).join('');
+
+    return `<div class="q-card" id="card-${q.id}">
+      <div class="q-top">
+        <span class="q-num">${i+1}</span>
+        <select class="q-type-select" onchange="setType('${q.id}',this.value)">${typeSel}</select>
+        <label class="q-required-toggle"><input type="checkbox" ${q.required?'checked':''} onchange="setRequired('${q.id}',this.checked)"> Required</label>
+        <button class="q-delete" onclick="removeQ('${q.id}')" title="Delete question">×</button>
+      </div>
+      <input class="q-label-input" placeholder="Question ${i+1}" value="${esc(q.label)}"
+        onchange="setLabel('${q.id}',this.value)"
+        onfocus="this.closest('.q-card').classList.add('focused')"
+        onblur="this.closest('.q-card').classList.remove('focused')"/>
+      ${optsHtml}
+    </div>`;
+  }).join('');
+}
+
+/* ============================================================
+   PRINT / PDF EXPORT
+   ============================================================ */
+function printForm() {
+  // Temporarily inject printable question markup into the build section
+  // so @media print picks it up cleanly.
+  const printId = 'print-q-overlay';
+  let existing = document.getElementById(printId);
+  if (existing) existing.remove();
+
+  const printDiv = document.createElement('div');
+  printDiv.id = printId;
+  printDiv.style.display = 'none'; // only shown in print media
+
+  const items = qs.map((q, i) => {
+    const label = q.label || `Question ${i+1}`;
+    const reqMark = q.required ? ' <span style="color:#c0392b">*</span>' : '';
+    let answerHtml = '';
+
+    if (['short','email','number','date'].includes(q.type)) {
+      answerHtml = `<span class="print-answer-line"></span>`;
+    } else if (q.type === 'long') {
+      answerHtml = `<span class="print-answer-box"></span>`;
+    } else if (q.type === 'radio') {
+      answerHtml = `<div class="print-options">${(q.options||[]).map(o =>
+        `<div class="print-option"><span class="print-option-circle"></span><span class="print-option-label">${esc(o)}</span></div>`
+      ).join('')}</div>`;
+    } else if (q.type === 'checkbox') {
+      answerHtml = `<div class="print-options">${(q.options||[]).map(o =>
+        `<div class="print-option"><span class="print-option-square"></span><span class="print-option-label">${esc(o)}</span></div>`
+      ).join('')}</div>`;
+    } else if (q.type === 'dropdown') {
+      answerHtml = `<div class="print-dropdown-opts">Options: ${(q.options||[]).map(o => esc(o)).join(' · ')}</div><span class="print-answer-line"></span>`;
+    }
+
+    return `<div class="q-card" style="page-break-inside:avoid">
+      <input class="q-label-input" value="${esc(label)}" readonly style="font-weight:600"/>
+      ${answerHtml}
+    </div>`;
+  }).join('');
+
+  printDiv.innerHTML = items;
+
+  // Insert after the questions-list so print CSS sees it as part of sec-build
+  document.getElementById('questions-list').after(printDiv);
+
+  // Temporarily hide the real questions list for print
+  const realList = document.getElementById('questions-list');
+  realList.dataset.printHide = '1';
+
+  // Inject a one-time print style to show printDiv and hide the real list
+  const style = document.createElement('style');
+  style.id = 'print-override';
+  style.textContent = `
+    @media print {
+      #questions-list { display: none !important; }
+      #${printId} { display: block !important; }
+      .add-q-bar { display: none !important; }
+    }
+  `;
+  document.head.appendChild(style);
+
+  window.print();
+
+  // Cleanup after print dialog closes
+  setTimeout(() => {
+    printDiv.remove();
+    style.remove();
+  }, 1000);
+}
+
+/* ============================================================
+   SERVER / SAVE
+   ============================================================ */
+function getServerUrl() {
+  return (document.getElementById('cfg-server-url').value || '').trim().replace(/\/$/, '');
+}
+
+function saveConfig() {
+  const url = getServerUrl();
+  if (url) localStorage.setItem('fd_server_url', url);
+}
+
+function getFormPayload() {
+  return {
+    id: FORM_ID,
+    title: document.getElementById('form-title').value || 'My Form',
+    desc: document.getElementById('form-desc').value || '',
+    questions: qs.map(q => ({ ...q })),
+  };
+}
+
+async function saveFormToServer() {
+  const serverUrl = getServerUrl();
+  if (!serverUrl) return { ok: false, error: 'No server URL configured. Go to Email alerts tab.' };
+
+  const payload = getFormPayload();
+  try {
+    const r = await fetch(serverUrl + '/forms', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(10000),
+    });
+    const j = await r.json();
+    return j;
+  } catch(e) {
+    return { ok: false, error: e.message };
+  }
+}
+
+async function saveAndCopyLink() {
+  const status = document.getElementById('save-status');
+  status.className = 'save-status info';
+  status.textContent = 'Saving form to server…';
+
+  const result = await saveFormToServer();
+
+  if (!result.ok) {
+    status.className = 'save-status warn';
+    status.textContent = '✗ ' + (result.error || 'Could not save form.');
+    return;
+  }
+
+  status.className = 'save-status ok';
+  status.textContent = '✓ Form saved! Link is ready.';
+
+  const url = getShareURL();
+  // Update displayed link so it reflects the server URL param
+  document.getElementById('share-link-display').textContent = url;
+  navigator.clipboard.writeText(url)
+    .then(() => toast('Link copied!'))
+    .catch(() => toast('Copy the link from the box above'));
+
+  renderQR(url);
+}
+
+/* ============================================================
+   SHARE URL — now just fill.html?id=UUID (short!)
+   ============================================================ */
+function getFillBase() {
+  const v = document.getElementById('fill-base-url').value.trim();
+  if (v) return v;
+  return window.location.href.replace(/\/builder\.html.*$/, '/fill.html');
+}
+
+function getShareURL() {
+  const serverUrl = getServerUrl();
+  let url = getFillBase() + '?id=' + encodeURIComponent(FORM_ID);
+  if (serverUrl) url += '&s=' + encodeURIComponent(serverUrl);
+  return url;
+}
+
+function refreshShare() {
+  const url = getShareURL();
+  document.getElementById('share-link-display').textContent = url;
+  // QR only re-renders after a successful save, not on every keystroke
+}
+
+/* ============================================================
+   QR CODE — fixed: always use canvas, consistent approach
+   ============================================================ */
+let qrLibLoaded = false;
+
+function loadQRLib(cb) {
+  if (qrLibLoaded) { cb(); return; }
+  const s = document.createElement('script');
+  s.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+  s.onload = () => { qrLibLoaded = true; cb(); };
+  s.onerror = () => toast('Could not load QR library');
+  document.head.appendChild(s);
+}
+
+function renderQR(url) {
+  loadQRLib(() => {
+    const wrap = document.getElementById('qr-output');
+    wrap.innerHTML = '';
+    // QRCode.js renders to a div; we give it a clean container and force canvas
+    new QRCode(wrap, {
+      text: url,
+      width: 180,
+      height: 180,
+      correctLevel: QRCode.CorrectLevel.M,
+      // Force canvas rendering — more reliable cross-browser than img
+    });
+  });
+}
+
+function downloadQR() {
+  const wrap = document.getElementById('qr-output');
+  // Try canvas first, then img fallback
+  const canvas = wrap.querySelector('canvas');
+  const img = wrap.querySelector('img');
+  if (canvas) {
+    const a = document.createElement('a');
+    a.download = 'form-qr.png';
+    a.href = canvas.toDataURL('image/png');
+    a.click();
+    toast('QR downloaded!');
+  } else if (img && img.src) {
+    // img src from QRCode.js is a data URL, so direct download works
+    const a = document.createElement('a');
+    a.download = 'form-qr.png';
+    a.href = img.src;
+    a.click();
+    toast('QR downloaded!');
+  } else {
+    toast('Save the form first to generate a QR code.');
+  }
+}
+
+/* ============================================================
+   EMAIL CONFIG
+   ============================================================ */
+function updateEmailStatus() {
+  const status = document.getElementById('email-status');
+  const testBtn = document.getElementById('test-btn');
+  const url = document.getElementById('cfg-server-url')?.value.trim();
+  if (!url) { status.className = 'email-status'; if(testBtn) testBtn.style.display='none'; return; }
+  const valid = url.startsWith('http://') || url.startsWith('https://');
+  if (valid) {
+    status.className = 'email-status ok';
+    status.textContent = '✓ Server URL set. Click "Test connection" to verify.';
+    if(testBtn) testBtn.style.display = '';
+  } else {
+    status.className = 'email-status warn';
+    status.textContent = 'URL must start with http:// or https://';
+    if(testBtn) testBtn.style.display = 'none';
+  }
+}
+
+async function testConnection() {
+  const url = getServerUrl();
+  if (!url) return;
+  const status = document.getElementById('email-status');
+  status.className = 'email-status ok'; status.textContent = 'Testing…';
+  try {
+    const r = await fetch(url + '/health', { signal: AbortSignal.timeout(6000) });
+    const j = await r.json();
+    if (j.ok) { status.textContent = '✓ Server is reachable and healthy!'; }
+    else { status.className = 'email-status warn'; status.textContent = 'Server responded but returned an error.'; }
+  } catch(e) {
+    status.className = 'email-status warn';
+    status.textContent = 'Could not reach server: ' + e.message;
+  }
+}
+
+/* ============================================================
+   PREVIEW
+   ============================================================ */
+function renderPreview() {
+  const title = document.getElementById('form-title').value || 'My Form';
+  const desc = document.getElementById('form-desc').value || '';
+  const el = document.getElementById('preview-content');
+  if (!qs.length) { el.innerHTML = '<div class="empty">No questions to preview.</div>'; return; }
+
+  const fields = qs.map(q => {
+    const req = q.required ? `<span class="req">*</span>` : '';
+    const lbl = q.label || 'Untitled question';
+    let inp = '';
+    if (['short','email','number'].includes(q.type)) {
+      const t = q.type === 'email' ? 'email' : q.type === 'number' ? 'number' : 'text';
+      inp = `<input type="${t}" placeholder="Your answer"/>`;
+    } else if (q.type === 'long') {
+      inp = `<textarea placeholder="Your answer"></textarea>`;
+    } else if (q.type === 'date') {
+      inp = `<input type="date"/>`;
+    } else if (q.type === 'radio') {
+      inp = `<div class="pv-options">${(q.options||[]).map(o => `<label class="pv-option"><input type="radio" name="${q.id}"> ${esc(o)}</label>`).join('')}</div>`;
+    } else if (q.type === 'checkbox') {
+      inp = `<div class="pv-options">${(q.options||[]).map(o => `<label class="pv-option"><input type="checkbox"> ${esc(o)}</label>`).join('')}</div>`;
+    } else if (q.type === 'dropdown') {
+      inp = `<select><option value="">Choose an option</option>${(q.options||[]).map(o=>`<option>${esc(o)}</option>`).join('')}</select>`;
+    }
+    return `<div class="pv-field"><label>${esc(lbl)}${req}</label>${inp}</div>`;
+  }).join('');
+
+  el.innerHTML = `
+    <p class="pv-title">${esc(title)}</p>
+    ${desc ? `<p class="pv-desc">${esc(desc)}</p>` : ''}
+    <div class="pv-fields">${fields}</div>
+    <button class="pv-submit" style="margin-top:1.5rem">Submit</button>`;
+}
+
+/* ============================================================
+   TABS
+   ============================================================ */
+function switchTab(name) {
+  const tabNames = ['build','email','share','preview'];
+  document.querySelectorAll('.tab-btn').forEach((b, i) => b.classList.toggle('active', tabNames[i] === name));
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.getElementById('sec-' + name).classList.add('active');
+  if (name === 'share') refreshShare();
+  if (name === 'preview') renderPreview();
+}
+
+/* ============================================================
+   TOAST
+   ============================================================ */
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+/* INIT */
+renderBuild();
+</script>
+</body>
+</html>
