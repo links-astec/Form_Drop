@@ -28,6 +28,11 @@ body {
   color: var(--text);
   min-height: 100vh;
   font-size: 15px;
+  -webkit-text-size-adjust: 100%;
+}
+button, select, input, textarea {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 .topbar {
   background: var(--surface);
@@ -80,7 +85,7 @@ body {
 .q-field select {
   width: 100%;
   font-family: 'DM Sans', sans-serif;
-  font-size: 14.5px;
+  font-size: 14.5px; /* overridden to 16px on mobile to prevent iOS zoom */
   padding: 10px 13px;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -173,11 +178,60 @@ body {
 .error-page { text-align: center; padding: 4rem 1.5rem; }
 .error-page h1 { font-size: 22px; font-weight: 600; margin-bottom: 10px; }
 .error-page p { font-size: 14px; color: var(--text2); line-height: 1.6; }
-@media (max-width: 600px) {
-  .main { padding: 1.5rem 1rem 4rem; }
-  .form-header { padding: 1.25rem; }
-  .q-field { padding: 1rem 1.1rem; }
-  .form-title { font-size: 21px; }
+/* ── RESPONSIVE ─────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  /* Topbar */
+  .topbar { padding: 0 1rem; height: 48px; }
+  .logo { font-size: 14px; }
+
+  /* Main */
+  .main { padding: 1rem 0.9rem 4rem; }
+
+  /* Form header */
+  .form-header {
+    padding: 1.25rem 1.1rem 1rem;
+    border-radius: 10px;
+    margin-bottom: 12px;
+  }
+  .form-title { font-size: 21px; letter-spacing: -0.2px; }
+  .form-desc { font-size: 13.5px; }
+
+  /* Question fields */
+  .q-fields { gap: 10px; }
+  .q-field { padding: 1rem 1.1rem; border-radius: 10px; }
+  .q-label { font-size: 14px; margin-bottom: 9px; }
+
+  /* Inputs — larger tap targets */
+  .q-field input[type=text],
+  .q-field input[type=email],
+  .q-field input[type=number],
+  .q-field input[type=date],
+  .q-field textarea,
+  .q-field select {
+    font-size: 16px; /* prevents iOS zoom on focus */
+    padding: 11px 12px;
+  }
+
+  /* Options — easier to tap */
+  .q-option { padding: 10px 12px; font-size: 14px; border-radius: 10px; }
+  .q-option input { width: 18px; height: 18px; }
+
+  /* Submit row */
+  .submit-row { flex-direction: column; align-items: stretch; gap: 10px; margin-top: 1.25rem; }
+  .submit-btn { width: 100%; padding: 14px; font-size: 16px; border-radius: 10px; }
+  .clear-btn { text-align: center; }
+
+  /* Success card */
+  .success-card { padding: 2.25rem 1.25rem; border-radius: 10px; }
+
+  /* Error div */
+  #submit-error { font-size: 13px; }
+}
+
+@media (max-width: 400px) {
+  .main { padding: 0.75rem 0.75rem 3.5rem; }
+  .form-title { font-size: 19px; }
+  .q-field { padding: 0.9rem 1rem; }
 }
 </style>
 </head>

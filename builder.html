@@ -30,6 +30,11 @@ body {
   color: var(--text);
   min-height: 100vh;
   font-size: 15px;
+  -webkit-text-size-adjust: 100%;
+}
+button, select, input, textarea {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 a { color: var(--accent); }
 
@@ -545,11 +550,95 @@ header {
   .print-dropdown-opts { margin-top: 4pt; font-size: 11pt; color: #444; }
 }
 
-@media (max-width: 600px) {
-  .main { padding: 1.25rem 1rem 4rem; }
-  header { padding: 0 1rem; }
+/* ── RESPONSIVE ─────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  /* Header */
+  header { padding: 0 1rem; height: 52px; }
+  .logo { font-size: 15px; }
+
+  /* Hide print button on mobile — printing from phone is rare */
+  .header-actions .btn:first-child { display: none; }
+
+  /* Compact header action buttons */
+  .header-actions .btn { padding: 6px 12px; font-size: 13px; }
+
+  /* Main layout */
+  .main { padding: 1rem 0.9rem 6rem; }
+
+  /* Tabs — scroll horizontally if they overflow */
+  .tabs {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    border-radius: 8px;
+    margin-bottom: 1.25rem;
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab-btn { padding: 7px 14px; font-size: 13px; white-space: nowrap; }
+
+  /* Form title */
   .form-title-input { font-size: 20px; }
-  .qr-area { flex-direction: column; }
+
+  /* Question cards */
+  .q-card { padding: 0.9rem 1rem; }
+  .q-top { gap: 7px; flex-wrap: wrap; }
+  .q-type-select { font-size: 11px; padding: 4px 8px; }
+  .q-required-toggle { font-size: 11px; }
+
+  /* Add question bar — 2 columns on mobile */
+  .add-q-bar { padding: 1rem; gap: 7px; }
+  .add-q-type {
+    font-size: 12px;
+    padding: 7px 10px;
+    flex: 1 1 calc(50% - 4px);
+    text-align: center;
+  }
+
+  /* Share tab */
+  .share-card { padding: 1.1rem; }
+  .link-row { flex-direction: column; gap: 8px; }
+  .link-row .btn { width: 100%; }
+  .link-box { font-size: 11px; }
+
+  /* UUID badge wraps */
+  .uuid-badge { font-size: 10px; word-break: break-all; white-space: normal; }
+
+  /* QR area stacks vertically and centres */
+  .qr-area { flex-direction: column; align-items: center; gap: 1.25rem; }
+  .qr-info { min-width: 0; width: 100%; text-align: center; }
+  .qr-actions { justify-content: center; }
+
+  /* Fill page base URL row */
+  #fill-base-url { font-size: 11px; }
+
+  /* Email config */
+  .email-config-card { padding: 1.1rem; }
+  .steps-list { gap: 8px; }
+  .step { font-size: 12px; }
+
+  /* Preview */
+  .preview-inner { padding: 1.25rem; }
+
+  /* Save status */
+  .save-status { font-size: 12px; }
+
+  /* Toast — full width on mobile */
+  .toast {
+    left: 1rem;
+    right: 1rem;
+    transform: translateY(10px);
+    text-align: center;
+    border-radius: 12px;
+  }
+  .toast.show { transform: translateY(0); }
+}
+
+@media (max-width: 400px) {
+  .main { padding: 0.75rem 0.75rem 5rem; }
+  .form-title-input { font-size: 18px; }
+  .add-q-type { flex: 1 1 100%; }
+  .tab-btn { padding: 6px 11px; font-size: 12px; }
 }
 </style>
 </head>
