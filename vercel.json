@@ -1,17 +1,14 @@
 {
   "version": 2,
-  "routes": [
-    { "src": "/api/formslist", "dest": "/api/formslist" },
-    { "src": "/api/forms/(.+)", "dest": "/api/forms" },
-    { "src": "/api/analytics/(.+)", "dest": "/api/analytics" },
-    { "src": "/api/(.*)", "dest": "/api/$1" },
-    { "src": "/", "dest": "/builder.html" },
-    { "src": "/(.*\\.html)", "dest": "/$1" }
+  "rewrites": [
+    { "source": "/api/forms/:id", "destination": "/api/forms" },
+    { "source": "/api/analytics/:id", "destination": "/api/analytics" },
+    { "source": "/", "destination": "/builder.html" }
   ],
   "functions": {
     "api/submit.js":     { "memory": 256, "maxDuration": 15 },
     "api/forms.js":      { "memory": 128, "maxDuration": 10 },
-    "api/formslist.js": { "memory": 128, "maxDuration": 10 },
+    "api/formslist.js":  { "memory": 128, "maxDuration": 10 },
     "api/analytics.js":  { "memory": 128, "maxDuration": 10 },
     "api/config.js":     { "memory": 128, "maxDuration": 5  },
     "api/health.js":     { "memory": 128, "maxDuration": 5  }
