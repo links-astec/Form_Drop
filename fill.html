@@ -205,19 +205,42 @@ const encodedF = params.get('f'); // legacy fallback
 
 const wrap = document.getElementById('main-wrap');
 
-// Server URL comes from the share link (?s=...) — works on any device.
-// Falls back to localStorage for the builder's own device.
-function getServerUrl() {
+// Priority order for resolving the server URL:
+// 1. ?s= param in the share link (set by builder, works on any device)
+// 2. /api/config endpoint (works when fill.html is hosted on the same Vercel deployment)
+// 3. localStorage fallback (builder's own device only)
+let _resolvedServerUrl = null;
+
+async function getServerUrl() {
+  if (_resolvedServerUrl !== null) return _resolvedServerUrl;
+
+  // 1. URL param — embedded by builder into every share link
   const p = new URLSearchParams(window.location.search);
-  const fromUrl = p.get('s');
-  if (fromUrl) return fromUrl.trim().replace(/\/$/, '');
-  return (localStorage.getItem('fd_server_url') || '').trim().replace(/\/$/, '');
+  const fromParam = p.get('s');
+  if (fromParam) {
+    _resolvedServerUrl = fromParam.trim().replace(/\/$/, '');
+    return _resolvedServerUrl;
+  }
+
+  // 2. /api/config — works when hosted on same Vercel deployment
+  try {
+    const r = await fetch('/api/config', { signal: AbortSignal.timeout(4000) });
+    const j = await r.json();
+    if (j.ok && j.serverUrl) {
+      _resolvedServerUrl = j.serverUrl.trim().replace(/\/$/, '');
+      return _resolvedServerUrl;
+    }
+  } catch(e) { /* ignore, try next */ }
+
+  // 3. localStorage last resort
+  _resolvedServerUrl = (localStorage.getItem('fd_server_url') || '').trim().replace(/\/$/, '');
+  return _resolvedServerUrl;
 }
 
 async function loadForm() {
   // New: load by ID from server
   if (formId) {
-    const serverUrl = getServerUrl();
+    const serverUrl = await getServerUrl();
     if (!serverUrl) {
       showError(
         'Cannot load form',
@@ -373,7 +396,7 @@ async function submitForm() {
   data.questions.forEach(q => { answers[q.id] = getValue(q); });
 
   // Try to post to server
-  const serverUrl = getServerUrl();
+  const serverUrl = await getServerUrl();
   const btn = document.getElementById('submit-btn');
 
   if (!serverUrl) {

@@ -607,15 +607,10 @@ header {
         <div class="step"><div class="step-num">1</div><span>Deploy your server to <a href="https://vercel.com" target="_blank">Vercel</a>, <a href="https://railway.app" target="_blank">Railway</a>, or <a href="https://render.com" target="_blank">Render</a></span></div>
         <div class="step"><div class="step-num">2</div><span>Set <code style="font-size:12px;background:var(--surface2);padding:1px 4px;border-radius:3px">SMTP_USER</code>, <code style="font-size:12px;background:var(--surface2);padding:1px 4px;border-radius:3px">SMTP_PASS</code>, <code style="font-size:12px;background:var(--surface2);padding:1px 4px;border-radius:3px">TO_EMAIL</code>, and <code style="font-size:12px;background:var(--surface2);padding:1px 4px;border-radius:3px">DATABASE_URL</code> in your environment variables</span></div>
         <div class="step"><div class="step-num">3</div><span>Get a Google App Password at <a href="https://myaccount.google.com/apppasswords" target="_blank">myaccount.google.com/apppasswords</a></span></div>
-        <div class="step"><div class="step-num">4</div><span>Paste the deployed URL below, then go to Share & QR to publish your form</span></div>
-      </div>
-      <div class="email-field">
-        <label class="email-label">Server URL</label>
-        <input class="email-input" id="cfg-server-url" type="url" placeholder="https://my-formdrop.vercel.app/api" oninput="updateEmailStatus(); saveConfig();"/>
-        <div class="email-hint">The base API URL of your deployed server — no trailing slash. For Vercel: include /api at the end.</div>
+        <div class="step"><div class="step-num">4</div><span>Set <code style="font-size:12px;background:var(--surface2);padding:1px 4px;border-radius:3px">PUBLIC_SERVER_URL</code> to your Vercel deployment URL + <code style="font-size:12px;background:var(--surface2);padding:1px 4px;border-radius:3px">/api</code> (e.g. <code style="font-size:12px;background:var(--surface2);padding:1px 4px;border-radius:3px">https://form-drop.vercel.app/api</code>), then redeploy</span></div>
       </div>
       <div class="email-status" id="email-status"></div>
-      <button class="btn" id="test-btn" onclick="testConnection()" style="margin-top:12px;display:none">Test connection</button>
+      <button class="btn" id="test-btn" onclick="testConnection()" style="margin-top:12px;">Test connection</button>
     </div>
     <div style="font-size:12.5px;color:var(--text3);line-height:1.6;padding:0 2px;">
       ℹ The server URL is saved locally and embedded in share links. All credentials stay on your server — never in the browser.<br>
@@ -704,13 +699,11 @@ function getOrCreateFormId() {
 
 const FORM_ID = getOrCreateFormId();
 
-// Restore server URL from localStorage
 window.addEventListener('DOMContentLoaded', () => {
-  const savedUrl = localStorage.getItem('fd_server_url') || '';
-  const el = document.getElementById('cfg-server-url');
-  if (el && savedUrl) { el.value = savedUrl; updateEmailStatus(); }
   document.getElementById('uuid-badge').textContent = 'Form ID: ' + FORM_ID;
   renderBuild();
+  // Auto-load server URL from /api/config
+  loadServerConfig();
 });
 
 /* ============================================================
@@ -862,14 +855,35 @@ function printForm() {
 
 /* ============================================================
    SERVER / SAVE
+   Auto-loaded from /api/config on page load — no manual input needed.
    ============================================================ */
+let _serverUrl = '';
+
+async function loadServerConfig() {
+  const status = document.getElementById('email-status');
+  try {
+    const r = await fetch('/api/config', { signal: AbortSignal.timeout(5000) });
+    const j = await r.json();
+    if (j.ok && j.serverUrl) {
+      _serverUrl = j.serverUrl.trim().replace(/\/$/, '');
+      status.className = 'email-status ok';
+      status.textContent = '✓ Server connected: ' + _serverUrl + (j.derived ? ' (auto-detected)' : '');
+      document.getElementById('test-btn').style.display = '';
+    } else {
+      throw new Error('No server URL returned');
+    }
+  } catch(e) {
+    status.className = 'email-status warn';
+    status.textContent = '✗ Could not reach server config: ' + e.message + '. Make sure PUBLIC_SERVER_URL is set in Vercel environment variables.';
+  }
+}
+
 function getServerUrl() {
-  return (document.getElementById('cfg-server-url').value || '').trim().replace(/\/$/, '');
+  return _serverUrl;
 }
 
 function saveConfig() {
-  const url = getServerUrl();
-  if (url) localStorage.setItem('fd_server_url', url);
+  // No-op — server URL comes from env, not user input
 }
 
 function getFormPayload() {
@@ -1004,31 +1018,22 @@ function downloadQR() {
    EMAIL CONFIG
    ============================================================ */
 function updateEmailStatus() {
-  const status = document.getElementById('email-status');
-  const testBtn = document.getElementById('test-btn');
-  const url = document.getElementById('cfg-server-url')?.value.trim();
-  if (!url) { status.className = 'email-status'; if(testBtn) testBtn.style.display='none'; return; }
-  const valid = url.startsWith('http://') || url.startsWith('https://');
-  if (valid) {
-    status.className = 'email-status ok';
-    status.textContent = '✓ Server URL set. Click "Test connection" to verify.';
-    if(testBtn) testBtn.style.display = '';
-  } else {
-    status.className = 'email-status warn';
-    status.textContent = 'URL must start with http:// or https://';
-    if(testBtn) testBtn.style.display = 'none';
-  }
+  // Status is now set by loadServerConfig() — this is a no-op kept for compatibility
 }
 
 async function testConnection() {
   const url = getServerUrl();
-  if (!url) return;
   const status = document.getElementById('email-status');
+  if (!url) {
+    status.className = 'email-status warn';
+    status.textContent = 'Server URL not loaded yet. Check that PUBLIC_SERVER_URL is set in Vercel.';
+    return;
+  }
   status.className = 'email-status ok'; status.textContent = 'Testing…';
   try {
     const r = await fetch(url + '/health', { signal: AbortSignal.timeout(6000) });
     const j = await r.json();
-    if (j.ok) { status.textContent = '✓ Server is reachable and healthy!'; }
+    if (j.ok) { status.textContent = '✓ Server is reachable and healthy! (' + url + ')'; }
     else { status.className = 'email-status warn'; status.textContent = 'Server responded but returned an error.'; }
   } catch(e) {
     status.className = 'email-status warn';
