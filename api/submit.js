@@ -79,6 +79,13 @@ module.exports = async function handler(req, res) {
   if (req.method === "OPTIONS") return res.status(200).end();
   if (req.method !== "POST") return res.status(405).json({ ok: false, error: "Method not allowed" });
 
+  if (!process.env.DATABASE_URL) {
+    return res.status(500).json({
+      ok: false,
+      error: "DATABASE_URL is not set in Vercel environment variables."
+    });
+  }
+
   const { formId, formTitle, questions, answers } = req.body;
   if (!formId || !formTitle || !Array.isArray(questions) || !answers) {
     return res.status(400).json({ ok: false, error: "formId, formTitle, questions, and answers are all required" });

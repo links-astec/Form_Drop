@@ -46,8 +46,23 @@ module.exports = async function handler(req, res) {
   setCors(res);
   if (req.method === "OPTIONS") return res.status(200).end();
 
+  // Guard: if DATABASE_URL isn't set, return a clear JSON error immediately
+  if (!process.env.DATABASE_URL) {
+    return res.status(500).json({
+      ok: false,
+      error: "DATABASE_URL is not set. Add it in Vercel → Project → Settings → Environment Variables, then redeploy."
+    });
+  }
+
   const pool = getPool();
-  if (!_tablesReady) { await ensureTables(pool); _tablesReady = true; }
+  try {
+    if (!_tablesReady) { await ensureTables(pool); _tablesReady = true; }
+  } catch (dbErr) {
+    return res.status(500).json({
+      ok: false,
+      error: "Database connection failed: " + dbErr.message
+    });
+  }
 
   // POST /api/forms — upsert a form definition
   if (req.method === "POST") {
