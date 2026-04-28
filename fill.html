@@ -6,6 +6,7 @@
 <title>Fill Form — FormDrop</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap" rel="stylesheet"/>
 <style>
+/* ── TOKENS ──────────────────────────────────────────────── */
 :root {
   --bg: #f7f5f0;
   --surface: #ffffff;
@@ -20,20 +21,29 @@
   --danger: #c0392b;
   --radius: 10px;
   --radius-lg: 14px;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-top: env(safe-area-inset-top, 0px);
 }
+
+/* ── RESET ───────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { height: 100%; }
 body {
   font-family: 'DM Sans', sans-serif;
   background: var(--bg);
   color: var(--text);
-  min-height: 100vh;
+  min-height: 100%;
   font-size: 15px;
   -webkit-text-size-adjust: 100%;
+  overscroll-behavior-y: contain;
 }
 button, select, input, textarea {
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
+  font-family: inherit;
 }
+
+/* ── TOP BAR ─────────────────────────────────────────────── */
 .topbar {
   background: var(--surface);
   border-bottom: 1px solid var(--border);
@@ -41,6 +51,9 @@ button, select, input, textarea {
   height: 52px;
   display: flex;
   align-items: center;
+  position: sticky;
+  top: 0;
+  z-index: 100;
 }
 .logo {
   font-size: 15px;
@@ -51,7 +64,11 @@ button, select, input, textarea {
   gap: 7px;
 }
 .logo-dot { width: 7px; height: 7px; background: var(--accent); border-radius: 50%; }
+
+/* ── LAYOUT ──────────────────────────────────────────────── */
 .main { max-width: 640px; margin: 0 auto; padding: 2.5rem 1.5rem 5rem; }
+
+/* ── FORM HEADER ─────────────────────────────────────────── */
 .form-header {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -64,6 +81,8 @@ button, select, input, textarea {
 .form-desc { font-size: 14px; color: var(--text2); line-height: 1.6; }
 .required-note { font-size: 12px; color: var(--text2); margin-bottom: 16px; }
 .required-note span { color: var(--danger); }
+
+/* ── QUESTION FIELDS ─────────────────────────────────────── */
 .q-fields { display: flex; flex-direction: column; gap: 12px; }
 .q-field {
   background: var(--surface);
@@ -75,8 +94,10 @@ button, select, input, textarea {
 .q-field.has-error { border-color: var(--danger); }
 .q-label { font-size: 14.5px; font-weight: 500; margin-bottom: 10px; line-height: 1.4; display: flex; align-items: flex-start; gap: 4px; }
 .q-label .req { color: var(--danger); flex-shrink: 0; }
-.error-msg { font-size: 12px; color: var(--danger); margin-top: 6px; display: none; }
+.error-msg { font-size: 12px; color: var(--danger); margin-top: 8px; display: none; background: var(--danger-light); padding: 6px 10px; border-radius: 6px; }
 .has-error .error-msg { display: block; }
+
+/* ── INPUTS ──────────────────────────────────────────────── */
 .q-field input[type=text],
 .q-field input[type=email],
 .q-field input[type=number],
@@ -84,64 +105,80 @@ button, select, input, textarea {
 .q-field textarea,
 .q-field select {
   width: 100%;
-  font-family: 'DM Sans', sans-serif;
-  font-size: 14.5px; /* overridden to 16px on mobile to prevent iOS zoom */
+  font-size: 14.5px;
   padding: 10px 13px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
   background: var(--bg);
   color: var(--text);
   outline: none;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  -webkit-appearance: none;
+  appearance: none;
 }
 .q-field input:focus, .q-field textarea:focus, .q-field select:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(42,92,69,0.1);
+  box-shadow: 0 0 0 3px rgba(42,92,69,0.12);
+  background: var(--surface);
 }
 .q-field textarea { resize: vertical; min-height: 100px; }
+.q-field select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b6760' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 36px;
+}
+
+/* ── OPTIONS ─────────────────────────────────────────────── */
 .q-options { display: flex; flex-direction: column; gap: 9px; }
 .q-option {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   font-size: 14.5px;
   cursor: pointer;
-  padding: 8px 12px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  padding: 12px 14px;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
   background: var(--bg);
-  transition: border-color 0.15s, background 0.15s;
+  transition: border-color 0.15s, background 0.15s, transform 0.1s;
   user-select: none;
+  min-height: 48px;
 }
-.q-option:hover { border-color: var(--border2); background: var(--surface); }
-.q-option input { cursor: pointer; accent-color: var(--accent); width: 16px; height: 16px; flex-shrink: 0; }
+.q-option:active { transform: scale(0.99); }
+.q-option input { cursor: pointer; accent-color: var(--accent); width: 18px; height: 18px; flex-shrink: 0; }
 .q-option.selected { border-color: var(--accent); background: var(--accent-light); }
+
+/* ── SUBMIT AREA ─────────────────────────────────────────── */
 .submit-row { margin-top: 1.5rem; display: flex; align-items: center; gap: 14px; }
 .submit-btn {
-  font-family: 'DM Sans', sans-serif;
   font-size: 15px;
   font-weight: 600;
   padding: 12px 34px;
   background: var(--accent);
   color: #fff;
   border: none;
-  border-radius: 9px;
+  border-radius: 10px;
   cursor: pointer;
-  transition: background 0.15s, transform 0.1s;
+  transition: background 0.15s, transform 0.12s, box-shadow 0.15s;
+  box-shadow: 0 2px 8px rgba(42,92,69,0.25);
 }
-.submit-btn:hover { background: #1d3f2f; }
-.submit-btn:active { transform: scale(0.98); }
-.submit-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+.submit-btn:hover { background: #1d3f2f; box-shadow: 0 4px 14px rgba(42,92,69,0.3); }
+.submit-btn:active { transform: scale(0.97); box-shadow: none; }
+.submit-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; box-shadow: none; }
 .clear-btn {
-  font-family: 'DM Sans', sans-serif;
   font-size: 13.5px;
   color: var(--text2);
   background: none;
   border: none;
   cursor: pointer;
-  padding: 4px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  transition: background 0.15s, color 0.15s;
 }
-.clear-btn:hover { color: var(--text); text-decoration: underline; }
+.clear-btn:hover { color: var(--text); background: var(--surface2); }
+
+/* ── SUCCESS CARD ────────────────────────────────────────── */
 .success-card {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -153,7 +190,7 @@ button, select, input, textarea {
 }
 .success-card.show { display: block; }
 .success-icon {
-  width: 56px; height: 56px;
+  width: 64px; height: 64px;
   background: var(--accent-light);
   border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
@@ -162,76 +199,179 @@ button, select, input, textarea {
 .success-title { font-size: 22px; font-weight: 600; margin-bottom: 8px; }
 .success-sub { font-size: 14px; color: var(--text2); line-height: 1.6; margin-bottom: 1.5rem; }
 .another-btn {
-  font-family: 'DM Sans', sans-serif;
   font-size: 14px;
   font-weight: 500;
-  padding: 9px 22px;
+  padding: 10px 24px;
   border: 1px solid var(--border2);
-  border-radius: 8px;
+  border-radius: 10px;
   background: var(--surface);
   color: var(--text);
   cursor: pointer;
   transition: background 0.15s;
+  min-height: 44px;
 }
 .another-btn:hover { background: var(--surface2); }
+
+/* ── LOADING / ERROR ─────────────────────────────────────── */
 .loading-state { text-align: center; padding: 4rem 1.5rem; color: var(--text2); font-size: 14px; }
 .error-page { text-align: center; padding: 4rem 1.5rem; }
 .error-page h1 { font-size: 22px; font-weight: 600; margin-bottom: 10px; }
 .error-page p { font-size: 14px; color: var(--text2); line-height: 1.6; }
-/* ── RESPONSIVE ─────────────────────────────────────────────── */
+
+/* ════════════════════════════════════════════════════════════
+   MOBILE — feels like a native form app
+   ════════════════════════════════════════════════════════════ */
 @media (max-width: 768px) {
-  /* Topbar */
-  .topbar { padding: 0 1rem; height: 48px; }
-  .logo { font-size: 14px; }
 
-  /* Main */
-  .main { padding: 1rem 0.9rem 4rem; }
+  /* Full-bleed app shell */
+  body { background: var(--surface); }
 
-  /* Form header */
-  .form-header {
-    padding: 1.25rem 1.1rem 1rem;
-    border-radius: 10px;
-    margin-bottom: 12px;
+  /* Top bar — extends to status bar */
+  .topbar {
+    padding: 0 1rem;
+    padding-top: var(--safe-top);
+    height: calc(50px + var(--safe-top));
+    border-bottom: 1px solid var(--border);
+    background: rgba(255,255,255,0.95);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    position: sticky;
+    top: 0;
   }
-  .form-title { font-size: 21px; letter-spacing: -0.2px; }
+  .logo { font-size: 15px; }
+
+  /* Main — edge-to-edge, no card gutters at top */
+  .main {
+    padding: 0 0 calc(2rem + var(--safe-bottom));
+    max-width: 100%;
+  }
+
+  /* Form header — full bleed, rounded bottom only */
+  .form-header {
+    border-radius: 0 0 20px 20px;
+    border-left: none;
+    border-right: none;
+    border-top-color: var(--accent);
+    margin-bottom: 8px;
+    padding: 1.4rem 1.1rem 1.25rem;
+  }
+  .form-title { font-size: 22px; }
   .form-desc { font-size: 13.5px; }
 
-  /* Question fields */
-  .q-fields { gap: 10px; }
-  .q-field { padding: 1rem 1.1rem; border-radius: 10px; }
-  .q-label { font-size: 14px; margin-bottom: 9px; }
+  .required-note { padding: 0 1rem; margin-bottom: 12px; }
 
-  /* Inputs — larger tap targets */
+  /* Questions — full bleed cards with horizontal padding */
+  .q-fields { gap: 8px; padding: 0; }
+  .q-field {
+    border-radius: 16px;
+    border-left: none;
+    border-right: none;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+    border-top: none;
+    border-bottom: 1px solid var(--border);
+    padding: 1.1rem 1rem;
+    background: var(--surface);
+  }
+  .q-field:last-child { border-bottom: none; }
+  .q-field.has-error { border-bottom: 2px solid var(--danger); }
+
+  /* Better label */
+  .q-label { font-size: 15px; margin-bottom: 12px; }
+
+  /* Inputs — native iOS/Android size to prevent zoom */
   .q-field input[type=text],
   .q-field input[type=email],
   .q-field input[type=number],
   .q-field input[type=date],
   .q-field textarea,
   .q-field select {
-    font-size: 16px; /* prevents iOS zoom on focus */
-    padding: 11px 12px;
+    font-size: 16px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    min-height: 50px;
+    border-width: 1.5px;
+  }
+  .q-field textarea { min-height: 110px; }
+
+  /* Options — large tap targets */
+  .q-options { gap: 8px; }
+  .q-option {
+    padding: 13px 14px;
+    border-radius: 12px;
+    font-size: 15px;
+    min-height: 52px;
+    gap: 14px;
+    border-width: 1.5px;
+  }
+  .q-option input { width: 20px; height: 20px; }
+
+  /* Submit area — sticky footer feel */
+  .submit-row {
+    flex-direction: column;
+    gap: 0;
+    margin: 0;
+    padding: 1rem 1rem calc(1.5rem + var(--safe-bottom));
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    position: sticky;
+    bottom: 0;
+    z-index: 10;
+  }
+  .submit-btn {
+    width: 100%;
+    min-height: 54px;
+    font-size: 17px;
+    border-radius: 14px;
+    letter-spacing: -0.2px;
+    box-shadow: 0 4px 16px rgba(42,92,69,0.28);
+  }
+  .clear-btn {
+    align-self: center;
+    margin-top: 8px;
+    font-size: 13px;
+    color: var(--text3);
+    padding: 4px 16px;
+    min-height: 36px;
   }
 
-  /* Options — easier to tap */
-  .q-option { padding: 10px 12px; font-size: 14px; border-radius: 10px; }
-  .q-option input { width: 18px; height: 18px; }
+  /* Error inline */
+  #submit-error {
+    margin: 0 1rem 0.75rem;
+    font-size: 13px;
+    border-radius: 10px;
+    padding: 10px 14px;
+  }
 
-  /* Submit row */
-  .submit-row { flex-direction: column; align-items: stretch; gap: 10px; margin-top: 1.25rem; }
-  .submit-btn { width: 100%; padding: 14px; font-size: 16px; border-radius: 10px; }
-  .clear-btn { text-align: center; }
+  /* Success — full screen feel */
+  .success-card {
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
+    padding: 3.5rem 1.5rem calc(3rem + var(--safe-bottom));
+    min-height: 60vh;
+  }
+  .success-icon { width: 72px; height: 72px; }
+  .success-title { font-size: 24px; }
+  .another-btn {
+    width: 100%;
+    min-height: 52px;
+    border-radius: 14px;
+    font-size: 15px;
+  }
 
-  /* Success card */
-  .success-card { padding: 2.25rem 1.25rem; border-radius: 10px; }
-
-  /* Error div */
-  #submit-error { font-size: 13px; }
+  /* Loading / error pages */
+  .loading-state { padding: 5rem 1.5rem; }
+  .error-page { padding: 4rem 1.5rem; }
 }
 
-@media (max-width: 400px) {
-  .main { padding: 0.75rem 0.75rem 3.5rem; }
-  .form-title { font-size: 19px; }
-  .q-field { padding: 0.9rem 1rem; }
+/* ── Very small (≤ 390px) ────────────────────────────────── */
+@media (max-width: 390px) {
+  .form-title { font-size: 20px; }
+  .q-label { font-size: 14px; }
+  .submit-btn { font-size: 16px; min-height: 50px; }
 }
 </style>
 </head>

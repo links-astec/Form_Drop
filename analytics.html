@@ -6,47 +6,78 @@
 <title>Analytics — FormDrop</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
 <style>
-:root{--bg:#f7f5f0;--surface:#fff;--surface2:#f0ede6;--border:#e2ddd4;--border2:#ccc7bc;--text:#1a1916;--text2:#6b6760;--text3:#a8a49e;--accent:#2a5c45;--accent-light:#e8f2ed;--accent-text:#1d3f2f;--danger:#c0392b;--radius-lg:14px}
+/* ── TOKENS ──────────────────────────────────────────────── */
+:root{
+  --bg:#f7f5f0;--surface:#fff;--surface2:#f0ede6;
+  --border:#e2ddd4;--border2:#ccc7bc;
+  --text:#1a1916;--text2:#6b6760;--text3:#a8a49e;
+  --accent:#2a5c45;--accent-light:#e8f2ed;--accent-text:#1d3f2f;
+  --danger:#c0392b;--radius-lg:14px;
+  --safe-bottom:env(safe-area-inset-bottom,0px);
+  --safe-top:env(safe-area-inset-top,0px);
+  --header-h:58px;
+}
+
+/* ── RESET ───────────────────────────────────────────────── */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:15px;-webkit-text-size-adjust:100%}
-button{-webkit-tap-highlight-color:transparent;touch-action:manipulation}
-header{background:var(--surface);border-bottom:1px solid var(--border);padding:0 2rem;height:58px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+html{height:100%}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100%;font-size:15px;-webkit-text-size-adjust:100%;overscroll-behavior-y:contain}
+button,select,input,textarea{-webkit-tap-highlight-color:transparent;touch-action:manipulation;font-family:inherit}
+
+/* ── HEADER ──────────────────────────────────────────────── */
+header{
+  background:var(--surface);border-bottom:1px solid var(--border);
+  padding:0 2rem;height:var(--header-h);
+  display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;z-index:200;
+}
 .logo{font-size:17px;font-weight:600;letter-spacing:-.3px;display:flex;align-items:center;gap:8px}
 .logo-dot{width:8px;height:8px;background:var(--accent);border-radius:50%}
 .header-right{display:flex;align-items:center;gap:10px}
-.btn{font-family:'DM Sans',sans-serif;font-size:13.5px;font-weight:500;padding:7px 16px;border-radius:8px;border:1px solid var(--border2);background:var(--surface);color:var(--text);cursor:pointer;transition:background .15s}
+
+/* ── BUTTONS ─────────────────────────────────────────────── */
+.btn{
+  font-family:'DM Sans',sans-serif;font-size:13.5px;font-weight:500;
+  padding:7px 16px;border-radius:8px;border:1px solid var(--border2);
+  background:var(--surface);color:var(--text);cursor:pointer;
+  transition:background .15s,transform .1s;
+  display:inline-flex;align-items:center;justify-content:center;gap:5px;
+}
 .btn:hover{background:var(--surface2)}
+.btn:active{transform:scale(0.97)}
 .btn-primary{background:var(--accent);color:#fff;border-color:var(--accent)}
 .btn-primary:hover{background:#1d3f2f}
+
+/* ── LAYOUT ──────────────────────────────────────────────── */
 .main{max-width:960px;margin:0 auto;padding:2rem 1.5rem 5rem}
 .page-title{font-size:24px;font-weight:600;letter-spacing:-.4px;margin-bottom:4px}
 .page-sub{font-size:14px;color:var(--text2);margin-bottom:2rem;line-height:1.5}
 
-/* CONFIG CARD */
+/* ── CONFIG CARD ─────────────────────────────────────────── */
 .config-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem 1.5rem;margin-bottom:1.5rem}
 .config-row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
 .config-field{flex:1;min-width:220px}
 .config-label{font-size:12px;font-weight:500;color:var(--text2);margin-bottom:5px;letter-spacing:.3px;text-transform:uppercase;display:block}
-.config-input{font-family:'DM Mono',monospace;font-size:13px;padding:9px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);outline:none;width:100%}
+.config-input{font-family:'DM Mono',monospace;font-size:13px;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);outline:none;width:100%;transition:border-color .15s}
 .config-input:focus{border-color:var(--accent)}
-.config-status{font-size:12.5px;margin-top:8px;color:var(--text3)}
+.config-status{font-size:12.5px;margin-top:8px;color:var(--text3);line-height:1.5}
 .config-status.ok{color:var(--accent)}
 .config-status.err{color:var(--danger)}
 
-/* STATS */
+/* ── STATS ───────────────────────────────────────────────── */
 .stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:2rem}
 .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1rem 1.25rem}
-.stat-label{font-size:12px;color:var(--text2);margin-bottom:4px;font-weight:500;text-transform:uppercase;letter-spacing:.4px}
-.stat-value{font-size:26px;font-weight:600;letter-spacing:-.5px}
+.stat-label{font-size:11px;color:var(--text2);margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+.stat-value{font-size:26px;font-weight:600;letter-spacing:-.5px;color:var(--text)}
 .stat-sub{font-size:12px;color:var(--text3);margin-top:2px}
 
-/* TIMELINE */
+/* ── TIMELINE ────────────────────────────────────────────── */
 .timeline-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.5rem;margin-bottom:2rem}
 .section-title{font-size:15px;font-weight:600;margin-bottom:1rem}
 .timeline-wrap{position:relative;height:120px}
 .timeline-wrap canvas{display:block}
 
-/* QUESTIONS GRID */
+/* ── QUESTION CHARTS ─────────────────────────────────────── */
 .questions-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:16px;margin-bottom:2rem}
 .q-analytics-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.5rem;overflow:hidden}
 .qa-title{font-size:14.5px;font-weight:500;margin-bottom:4px;line-height:1.4}
@@ -58,78 +89,107 @@ header{background:var(--surface);border-bottom:1px solid var(--border);padding:0
 .legend-label{flex:1;color:var(--text);line-height:1.3}
 .legend-pct{font-weight:600;font-size:13px;font-family:'DM Mono',monospace}
 .text-answers{display:flex;flex-direction:column;gap:6px;max-height:220px;overflow-y:auto}
-.text-answer{font-size:13.5px;background:var(--bg);border:1px solid var(--border);border-radius:7px;padding:7px 10px;color:var(--text2);line-height:1.4}
+.text-answer{font-size:13.5px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px 11px;color:var(--text2);line-height:1.4}
 .no-answers{font-size:13px;color:var(--text3);font-style:italic}
 
-/* TABLE */
+/* ── TABLE ───────────────────────────────────────────────── */
 .table-section{margin-top:2rem}
-.resp-table-wrap{overflow-x:auto;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg)}
+.resp-table-wrap{overflow-x:auto;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);-webkit-overflow-scrolling:touch}
 .resp-table{width:100%;border-collapse:collapse;font-size:13px}
-.resp-table th{text-align:left;padding:10px 14px;background:var(--surface2);border-bottom:1px solid var(--border);font-weight:500;color:var(--text2);white-space:nowrap}
+.resp-table th{text-align:left;padding:10px 14px;background:var(--surface2);border-bottom:1px solid var(--border);font-weight:500;color:var(--text2);white-space:nowrap;position:sticky;top:0}
 .resp-table td{padding:10px 14px;border-bottom:1px solid var(--border);color:var(--text);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .resp-table tr:last-child td{border-bottom:none}
 .resp-table tr:hover td{background:var(--surface2)}
-.badge{display:inline-block;font-size:11px;font-weight:500;padding:2px 8px;border-radius:30px;background:var(--accent-light);color:var(--accent)}
+.badge{display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;padding:2px 8px;border-radius:30px;background:var(--accent-light);color:var(--accent);min-width:28px}
 .export-row{display:flex;gap:10px;margin-top:1rem;flex-wrap:wrap}
 
-/* STATES */
+/* ── STATES ──────────────────────────────────────────────── */
 .empty-state{text-align:center;padding:4rem 1.5rem;color:var(--text2)}
 .empty-state h2{font-size:20px;font-weight:600;margin-bottom:8px;color:var(--text)}
 .empty-state p{font-size:14px;line-height:1.6}
 .loading-msg{text-align:center;padding:3rem;color:var(--text3);font-size:14px}
 
-/* ── RESPONSIVE ─────────────────────────────────────────────── */
+/* ════════════════════════════════════════════════════════════
+   MOBILE
+   ════════════════════════════════════════════════════════════ */
 @media(max-width:768px){
-  header{padding:0 1rem;height:52px}
-  .logo{font-size:15px}
-  .header-right{gap:7px}
-  .btn{padding:6px 12px;font-size:13px}
 
-  .main{padding:1rem 0.9rem 5rem}
+  /* Header */
+  header{
+    padding:0 1rem;
+    padding-top:var(--safe-top);
+    height:calc(52px + var(--safe-top));
+    background:rgba(255,255,255,0.95);
+    backdrop-filter:blur(10px);
+    -webkit-backdrop-filter:blur(10px);
+  }
+  .logo{font-size:15px}
+  .header-right{gap:8px}
+  .btn{padding:7px 14px;font-size:13px;border-radius:10px;min-height:38px}
+
+  /* Main */
+  .main{padding:1rem 0.9rem calc(2rem + var(--safe-bottom))}
   .page-title{font-size:20px}
   .page-sub{font-size:13px;margin-bottom:1.25rem}
 
-  /* Config card stacks vertically */
-  .config-card{padding:1rem}
+  /* Config card — stacks vertically */
+  .config-card{padding:1rem;border-radius:var(--radius-lg)}
   .config-row{flex-direction:column;gap:10px}
-  .config-row .btn{width:100%;padding:10px}
-  .config-input{font-size:14px}
+  .config-field{min-width:0}
+  .config-row .btn{
+    width:100%;min-height:48px;
+    border-radius:12px;font-size:15px;
+  }
+  .config-input{font-size:16px;padding:12px 14px;min-height:48px;border-radius:10px}
+  .config-status{font-size:13px}
 
-  /* Stats — 2 columns */
-  .stats-row{grid-template-columns:1fr 1fr;gap:10px;margin-bottom:1.25rem}
-  .stat-value{font-size:22px}
-  .stat-value[style*="font-size:17px"]{font-size:15px!important}
+  /* Stats — 2x2 grid */
+  .stats-row{grid-template-columns:1fr 1fr;gap:10px;margin-bottom:1.5rem}
+  .stat-card{padding:0.9rem 1rem;border-radius:12px}
+  .stat-value{font-size:24px}
+  .stat-label{font-size:10px}
 
   /* Timeline */
-  .timeline-card{padding:1rem}
-  .timeline-wrap{height:100px}
+  .timeline-card{padding:1rem;border-radius:var(--radius-lg);margin-bottom:1.5rem}
+  .section-title{font-size:14px}
+  .timeline-wrap{height:90px}
 
-  /* Questions grid — single column */
-  .questions-grid{grid-template-columns:1fr;gap:12px}
-  .q-analytics-card{padding:1.1rem}
+  /* Charts — single column */
+  .questions-grid{grid-template-columns:1fr;gap:10px;margin-bottom:1.5rem}
+  .q-analytics-card{padding:1.1rem;border-radius:var(--radius-lg)}
+  .qa-title{font-size:14px}
+  .chart-wrap{flex-direction:row;gap:1rem;align-items:center}
 
-  /* Chart wrap stacks on small screens */
-  .chart-wrap{flex-direction:column;align-items:flex-start;gap:1rem}
+  /* Text answers */
+  .text-answers{max-height:160px}
+  .text-answer{font-size:13px}
 
-  /* Table — horizontal scroll */
+  /* Table — horizontal scroll with nice styling */
   .table-section{margin-top:1.5rem}
-  .resp-table-wrap{border-radius:10px}
-  .resp-table th,.resp-table td{padding:8px 10px;font-size:12px}
+  .resp-table-wrap{border-radius:var(--radius-lg)}
+  .resp-table th{padding:9px 12px;font-size:11px}
+  .resp-table td{padding:9px 12px;font-size:12px}
 
-  /* Export row */
+  /* Export */
   .export-row{flex-direction:column;gap:8px}
-  .export-row .btn{width:100%;text-align:center}
+  .export-row .btn{
+    width:100%;text-align:center;
+    min-height:48px;border-radius:12px;font-size:15px;
+  }
 
-  /* Toast */
-  .toast{left:1rem;right:1rem;transform:translateY(10px);text-align:center;border-radius:12px}
-  .toast.show{transform:translateY(0)}
+  /* Empty/loading */
+  .empty-state{padding:3rem 1rem}
+  .empty-state h2{font-size:18px}
 }
 
-@media(max-width:400px){
-  .main{padding:0.75rem 0.75rem 4rem}
-  .stats-row{grid-template-columns:1fr}
-  .stat-value{font-size:24px}
+/* ── Very small ──────────────────────────────────────────── */
+@media(max-width:390px){
+  .main{padding-left:0.75rem;padding-right:0.75rem}
+  .stats-row{grid-template-columns:1fr 1fr}
+  .stat-value{font-size:20px}
   .page-title{font-size:18px}
+  .config-input{font-size:15px}
+  .chart-wrap{flex-direction:column;align-items:flex-start}
 }
 </style>
 </head>
