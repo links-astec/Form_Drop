@@ -291,7 +291,7 @@ async function loadFormsDropdown(serverUrl) {
   status.className = 'config-status';
   status.textContent = 'Loading forms…';
   try {
-    const r = await fetch(serverUrl + '/forms-list', { signal: AbortSignal.timeout(8000) });
+    const r = await fetch(serverUrl + '/formslist', { signal: AbortSignal.timeout(8000) });
     const text = await r.text();
     let j;
     try { j = JSON.parse(text); } catch(e) { throw new Error('Server error (HTTP ' + r.status + ')'); }
