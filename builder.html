@@ -1031,7 +1031,7 @@ async function deleteForm(id, title) {
   const serverUrl = getServerUrl();
   if (!serverUrl) { toast('Server not connected'); return; }
   try {
-    const r = await fetch(serverUrl + '/forms-list?id=' + encodeURIComponent(id), {
+    const r = await fetch(serverUrl + '/formslist?id=' + encodeURIComponent(id), {
       method: 'DELETE',
       signal: AbortSignal.timeout(8000),
     });
