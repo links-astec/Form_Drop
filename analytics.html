@@ -207,18 +207,20 @@ header{
   <div class="page-sub">Live response data pulled from your database.</div>
 
   <div class="config-card">
-    <div class="config-row">
+    <div class="config-row" id="server-row">
       <div class="config-field">
         <label class="config-label">Server URL</label>
         <input class="config-input" id="server-url" type="url" placeholder="https://my-formdrop.vercel.app/api" oninput="saveServerUrl()"/>
       </div>
-      <div class="config-field">
-        <label class="config-label">Form ID</label>
-        <input class="config-input" id="form-id-input" type="text" placeholder="xxxxxxxx-xxxx-4xxx-xxxx-xxxxxxxxxxxx" oninput="saveFormId()"/>
-      </div>
-      <button class="btn btn-primary" onclick="loadAnalytics()">Load</button>
+      <button class="btn btn-primary" onclick="connectAndLoadForms()">Connect</button>
     </div>
-    <div class="config-status" id="config-status">Enter your server URL and form ID, then click Load.</div>
+    <div id="form-picker-row" style="display:none;margin-top:1rem;">
+      <label class="config-label">Select form</label>
+      <select class="config-input" id="form-picker" onchange="onFormPicked(this.value)" style="cursor:pointer;">
+        <option value="">— Choose a form —</option>
+      </select>
+    </div>
+    <div class="config-status" id="config-status">Connecting to server…</div>
   </div>
 
   <div id="analytics-body"></div>
@@ -229,40 +231,105 @@ header{
 <script>
 const COLORS=['#2a5c45','#4a9e7d','#f59e0b','#3b82f6','#ec4899','#8b5cf6','#ef4444','#14b8a6','#f97316','#6366f1'];
 
-// Persist config
 function saveServerUrl() {
   localStorage.setItem('fd_server_url', document.getElementById('server-url').value.trim());
 }
-function saveFormId() {
-  localStorage.setItem('fd_analytics_form_id', document.getElementById('form-id-input').value.trim());
-}
 
-window.addEventListener('DOMContentLoaded', () => {
-  const url = localStorage.getItem('fd_server_url') || '';
-  const id  = localStorage.getItem('fd_form_uuid') || localStorage.getItem('fd_analytics_form_id') || '';
-  document.getElementById('server-url').value = url;
-  document.getElementById('form-id-input').value = id;
-});
-
+let _analyticsServerUrl = '';
 let currentData = null;
 let chartInstances = [];
 
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
-async function loadAnalytics() {
-  const serverUrl = document.getElementById('server-url').value.trim().replace(/\/$/,'');
-  const formId    = document.getElementById('form-id-input').value.trim();
-  const status    = document.getElementById('config-status');
-  const body      = document.getElementById('analytics-body');
+window.addEventListener('DOMContentLoaded', async () => {
+  const status = document.getElementById('config-status');
 
-  if (!serverUrl || !formId) {
+  // Auto-detect server URL
+  let serverUrl = '';
+  try {
+    const r = await fetch('/api/config', { signal: AbortSignal.timeout(4000) });
+    const j = await r.json();
+    if (j.ok && j.serverUrl) serverUrl = j.serverUrl.trim().replace(/\/$/, '');
+  } catch(e) {}
+  if (!serverUrl) serverUrl = localStorage.getItem('fd_server_url') || '';
+
+  if (serverUrl) {
+    document.getElementById('server-url').value = serverUrl;
+    _analyticsServerUrl = serverUrl;
+    await loadFormsDropdown(serverUrl);
+
+    // Auto-select the form that's currently active in builder
+    const activeId = localStorage.getItem('fd_form_uuid') || '';
+    const picker = document.getElementById('form-picker');
+    if (activeId && picker) {
+      // Find option matching activeId
+      const opt = Array.from(picker.options).find(o => o.value === activeId);
+      if (opt) {
+        picker.value = activeId;
+        loadAnalytics(activeId);
+      }
+    }
+  } else {
     status.className = 'config-status err';
-    status.textContent = 'Please enter both a server URL and a form ID.';
-    return;
+    status.textContent = 'Could not auto-detect server. Enter your server URL and click Connect.';
+    document.getElementById('server-row').style.display = 'flex';
   }
+});
+
+async function connectAndLoadForms() {
+  const serverUrl = document.getElementById('server-url').value.trim().replace(/\/$/, '');
+  if (!serverUrl) return;
+  localStorage.setItem('fd_server_url', serverUrl);
+  _analyticsServerUrl = serverUrl;
+  await loadFormsDropdown(serverUrl);
+}
+
+async function loadFormsDropdown(serverUrl) {
+  const status = document.getElementById('config-status');
+  const pickerRow = document.getElementById('form-picker-row');
+  const picker = document.getElementById('form-picker');
+  status.className = 'config-status';
+  status.textContent = 'Loading forms…';
+  try {
+    const r = await fetch(serverUrl + '/forms-list', { signal: AbortSignal.timeout(8000) });
+    const text = await r.text();
+    let j;
+    try { j = JSON.parse(text); } catch(e) { throw new Error('Server error (HTTP ' + r.status + ')'); }
+    if (!j.ok) throw new Error(j.error || 'Could not load forms');
+
+    const forms = j.forms;
+    if (!forms.length) {
+      status.className = 'config-status';
+      status.textContent = 'No forms found. Build and save a form first.';
+      return;
+    }
+
+    // Populate dropdown
+    picker.innerHTML = '<option value="">— Choose a form —</option>' +
+      forms.map(f => `<option value="${esc(f.id)}">${esc(f.title || 'Untitled')} (${f.response_count} response${f.response_count!==1?'s':''})</option>`).join('');
+    pickerRow.style.display = 'block';
+    status.className = 'config-status ok';
+    status.textContent = `✓ Connected — ${forms.length} form${forms.length!==1?'s':''} found`;
+  } catch(e) {
+    status.className = 'config-status err';
+    status.textContent = '✗ ' + e.message;
+  }
+}
+
+function onFormPicked(formId) {
+  if (!formId) return;
+  loadAnalytics(formId);
+}
+
+async function loadAnalytics(formId) {
+  const serverUrl = _analyticsServerUrl || document.getElementById('server-url').value.trim().replace(/\/$/,'');
+  if (!serverUrl || !formId) return;
+
+  const status = document.getElementById('config-status');
+  const body   = document.getElementById('analytics-body');
 
   status.className = 'config-status';
-  status.textContent = 'Loading…';
+  status.textContent = 'Loading responses…';
   body.innerHTML = '<div class="loading-msg">Fetching data…</div>';
   document.getElementById('export-btn').style.display = 'none';
 
@@ -270,12 +337,14 @@ async function loadAnalytics() {
     const r = await fetch(`${serverUrl}/analytics/${encodeURIComponent(formId)}`, {
       signal: AbortSignal.timeout(12000),
     });
-    const data = await r.json();
+    const text = await r.text();
+    let data;
+    try { data = JSON.parse(text); } catch(e) { throw new Error('Server error (HTTP ' + r.status + ')'); }
     if (!data.ok) throw new Error(data.error || 'Server error');
 
     currentData = data;
     status.className = 'config-status ok';
-    status.textContent = `✓ Loaded ${data.total} response${data.total===1?'':'s'} for "${data.form.title}"`;
+    status.textContent = `✓ ${data.total} response${data.total===1?'':'s'} for "${data.form.title}"`;
     renderAnalytics(data);
     if (data.total > 0) document.getElementById('export-btn').style.display = '';
   } catch(e) {

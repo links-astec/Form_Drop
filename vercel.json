@@ -1,6 +1,7 @@
 {
   "version": 2,
   "routes": [
+    { "src": "/api/forms-list", "dest": "/api/forms-list" },
     { "src": "/api/forms/(.+)", "dest": "/api/forms" },
     { "src": "/api/analytics/(.+)", "dest": "/api/analytics" },
     { "src": "/api/(.*)", "dest": "/api/$1" },
@@ -8,10 +9,11 @@
     { "src": "/(.*\\.html)", "dest": "/$1" }
   ],
   "functions": {
-    "api/submit.js":    { "memory": 256, "maxDuration": 15 },
-    "api/forms.js":     { "memory": 128, "maxDuration": 10 },
-    "api/analytics.js": { "memory": 128, "maxDuration": 10 },
-    "api/config.js":    { "memory": 128, "maxDuration": 5  },
-    "api/health.js":    { "memory": 128, "maxDuration": 5  }
+    "api/submit.js":     { "memory": 256, "maxDuration": 15 },
+    "api/forms.js":      { "memory": 128, "maxDuration": 10 },
+    "api/forms-list.js": { "memory": 128, "maxDuration": 10 },
+    "api/analytics.js":  { "memory": 128, "maxDuration": 10 },
+    "api/config.js":     { "memory": 128, "maxDuration": 5  },
+    "api/health.js":     { "memory": 128, "maxDuration": 5  }
   }
 }

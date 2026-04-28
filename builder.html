@@ -422,6 +422,55 @@ header {
 .step { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; color: var(--text2); line-height: 1.5; }
 .step-num { min-width: 22px; height: 22px; background: var(--surface2); border: 1px solid var(--border); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; color: var(--text); flex-shrink: 0; margin-top: 1px; }
 
+/* ── FORMS LIST ──────────────────────────────────────────── */
+.form-list-item {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.1rem 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  margin-bottom: 10px;
+}
+.form-list-item:hover { border-color: var(--border2); box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+.form-list-info { flex: 1; min-width: 0; }
+.form-list-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 4px;
+}
+.form-list-meta { font-size: 12px; color: var(--text3); display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.form-list-meta .pill {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text2);
+}
+.form-list-meta .pill.accent { background: var(--accent-light); color: var(--accent); border-color: var(--accent-light); }
+.form-list-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.form-list-actions .btn { padding: 5px 12px; font-size: 12.5px; border-radius: 7px; }
+.form-list-actions .btn-del { color: var(--danger); border-color: var(--border); }
+.form-list-actions .btn-del:hover { background: var(--danger-light); border-color: var(--danger); }
+.forms-empty {
+  text-align: center;
+  padding: 3.5rem 1.5rem;
+  color: var(--text3);
+  font-size: 14px;
+  background: var(--surface);
+  border: 1px dashed var(--border2);
+  border-radius: var(--radius-lg);
+}
+.forms-empty strong { display: block; font-size: 16px; color: var(--text2); margin-bottom: 6px; font-weight: 600; }
+
 /* ── TOAST ───────────────────────────────────────────────── */
 .toast {
   position: fixed;
@@ -644,6 +693,11 @@ header {
   .preview-wrap { border: none; border-radius: 0; background: transparent; }
   .preview-inner { padding: 0; }
 
+  /* ── Forms list on mobile ── */
+  .form-list-item { flex-direction: column; align-items: flex-start; gap: 0.75rem; padding: 1rem; }
+  .form-list-actions { width: 100%; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+  .form-list-actions .btn { text-align: center; min-height: 40px; font-size: 13px; }
+
   /* ── Toast — above bottom nav ── */
   .toast {
     bottom: calc(var(--bottom-nav-h) + var(--safe-bottom) + 12px);
@@ -682,6 +736,7 @@ header {
   <!-- Desktop header actions -->
   <div class="header-actions">
     <button class="btn" onclick="printForm()" title="Export as printable PDF">🖨 Print</button>
+    <button class="btn" onclick="window.open('analytics.html','_blank')">Analytics</button>
     <button class="btn" onclick="switchTab('preview')">Preview</button>
     <button class="btn btn-primary" onclick="switchTab('share')">Share →</button>
   </div>
@@ -689,6 +744,10 @@ header {
 
 <!-- Mobile bottom navigation — hidden on desktop via CSS -->
 <nav class="mobile-nav" id="mobile-nav">
+  <button class="mobile-nav-item" id="nav-forms" onclick="switchTab('forms')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+    Forms
+  </button>
   <button class="mobile-nav-item active" id="nav-build" onclick="switchTab('build')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="13" y2="12"/></svg>
     Build
@@ -705,6 +764,10 @@ header {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
     Preview
   </button>
+  <button class="mobile-nav-item" id="nav-analytics" onclick="window.open('analytics.html','_blank')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+    Analytics
+  </button>
   <button class="mobile-nav-item" id="nav-print" onclick="printForm()">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
     Print
@@ -713,10 +776,25 @@ header {
 
 <div class="main">
   <div class="tabs">
+    <button class="tab-btn" onclick="switchTab('forms')">My Forms</button>
     <button class="tab-btn active" onclick="switchTab('build')">Build</button>
     <button class="tab-btn" onclick="switchTab('email')">Email alerts</button>
     <button class="tab-btn" onclick="switchTab('share')">Share & QR</button>
     <button class="tab-btn" onclick="switchTab('preview')">Preview</button>
+  </div>
+
+  <!-- FORMS LIST -->
+  <div id="sec-forms" class="section">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;flex-wrap:wrap;gap:10px;">
+      <div>
+        <div style="font-size:20px;font-weight:600;letter-spacing:-0.3px;">My Forms</div>
+        <div style="font-size:13px;color:var(--text2);margin-top:2px;">All forms saved to your database</div>
+      </div>
+      <button class="btn btn-primary" onclick="newForm()">+ New form</button>
+    </div>
+    <div id="forms-list-body">
+      <div style="text-align:center;padding:3rem 1rem;color:var(--text3);font-size:14px;">Loading…</div>
+    </div>
   </div>
 
   <!-- BUILD -->
@@ -825,30 +903,167 @@ header {
 let qs = [];
 let qIdx = 0;
 
-// UUID: persist across sessions so the same form always has the same ID
+// Active form ID — mutable so we can load different forms from the list
+let FORM_ID = getOrCreateFormId();
+
+function generateUUID() {
+  return (typeof crypto !== 'undefined' && crypto.randomUUID)
+    ? crypto.randomUUID()
+    : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+        const r = Math.random() * 16 | 0;
+        return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+      });
+}
+
 function getOrCreateFormId() {
   let id = localStorage.getItem('fd_form_uuid');
-  if (!id) {
-    // crypto.randomUUID is available in all modern browsers
-    id = (typeof crypto !== 'undefined' && crypto.randomUUID)
-      ? crypto.randomUUID()
-      : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
-          const r = Math.random() * 16 | 0;
-          return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
-        });
-    localStorage.setItem('fd_form_uuid', id);
-  }
+  if (!id) { id = generateUUID(); localStorage.setItem('fd_form_uuid', id); }
   return id;
 }
 
-const FORM_ID = getOrCreateFormId();
+function setActiveFormId(id) {
+  FORM_ID = id;
+  localStorage.setItem('fd_form_uuid', id);
+  const badge = document.getElementById('uuid-badge');
+  if (badge) badge.textContent = 'Form ID: ' + id;
+}
 
 window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('uuid-badge').textContent = 'Form ID: ' + FORM_ID;
   renderBuild();
-  // Auto-load server URL from /api/config
   loadServerConfig();
 });
+
+/* ============================================================
+   FORMS LIST — CRUD
+   ============================================================ */
+
+async function loadFormsList() {
+  const body = document.getElementById('forms-list-body');
+  const serverUrl = getServerUrl();
+  if (!serverUrl) {
+    body.innerHTML = `<div class="forms-empty"><strong>Server not connected</strong>Go to Email alerts and check your server connection.</div>`;
+    return;
+  }
+  body.innerHTML = `<div style="text-align:center;padding:2rem;color:var(--text3);font-size:14px;">Loading…</div>`;
+  try {
+    const r = await fetch(serverUrl + '/forms-list', { signal: AbortSignal.timeout(10000) });
+    const text = await r.text();
+    let j;
+    try { j = JSON.parse(text); } catch(e) { throw new Error('Server error (HTTP ' + r.status + ')'); }
+    if (!j.ok) throw new Error(j.error || 'Unknown error');
+    renderFormsList(j.forms);
+  } catch(e) {
+    body.innerHTML = `<div class="forms-empty"><strong>Could not load forms</strong>${esc(e.message)}</div>`;
+  }
+}
+
+function renderFormsList(forms) {
+  const body = document.getElementById('forms-list-body');
+  if (!forms.length) {
+    body.innerHTML = `<div class="forms-empty"><strong>No forms yet</strong>Click "+ New form" to create your first form.</div>`;
+    return;
+  }
+  body.innerHTML = forms.map(f => {
+    const updated = new Date(f.updated_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+    const isActive = f.id === FORM_ID;
+    return `<div class="form-list-item" id="fli-${f.id}">
+      <div class="form-list-info">
+        <div class="form-list-title">${esc(f.title || 'Untitled form')}</div>
+        <div class="form-list-meta">
+          <span class="pill">${f.question_count} question${f.question_count !== 1 ? 's' : ''}</span>
+          <span class="pill accent">${f.response_count} response${f.response_count !== 1 ? 's' : ''}</span>
+          <span>Updated ${updated}</span>
+          ${isActive ? '<span style="color:var(--accent);font-weight:600;">● Active</span>' : ''}
+        </div>
+      </div>
+      <div class="form-list-actions">
+        <button class="btn" onclick="editForm('${f.id}')">✏ Edit</button>
+        <button class="btn" onclick="shareForm('${f.id}')">🔗 Share</button>
+        <button class="btn btn-del" onclick="deleteForm('${f.id}', '${esc(f.title || 'Untitled form')}')">🗑 Delete</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function editForm(id) {
+  const serverUrl = getServerUrl();
+  if (!serverUrl) { toast('Server not connected'); return; }
+  toast('Loading form…');
+  try {
+    const r = await fetch(serverUrl + '/forms/' + encodeURIComponent(id), { signal: AbortSignal.timeout(8000) });
+    const text = await r.text();
+    let j;
+    try { j = JSON.parse(text); } catch(e) { throw new Error('Server error'); }
+    if (!j.ok || !j.form) throw new Error(j.error || 'Form not found');
+
+    const form = j.form;
+    // Load into builder state
+    setActiveFormId(form.id);
+    document.getElementById('form-title').value = form.title || '';
+    document.getElementById('form-desc').value = form.desc || '';
+
+    // Reconstruct questions — preserve IDs so existing submissions still match
+    qs = (form.questions || []).map(q => ({ ...q }));
+    // Make sure qIdx won't collide with existing IDs
+    qIdx = qs.reduce((max, q) => {
+      const n = parseInt((q.id || '').replace('q', ''), 10);
+      return isNaN(n) ? max : Math.max(max, n);
+    }, 0);
+
+    renderBuild();
+    switchTab('build');
+    toast('Form loaded — edit and save to update it');
+  } catch(e) {
+    toast('Could not load form: ' + e.message);
+  }
+}
+
+function shareForm(id) {
+  // Switch to this form's share view
+  setActiveFormId(id);
+  switchTab('share');
+  toast('Showing share link for this form');
+}
+
+async function deleteForm(id, title) {
+  if (!confirm(`Delete "${title}" and ALL its responses? This cannot be undone.`)) return;
+  const serverUrl = getServerUrl();
+  if (!serverUrl) { toast('Server not connected'); return; }
+  try {
+    const r = await fetch(serverUrl + '/forms-list?id=' + encodeURIComponent(id), {
+      method: 'DELETE',
+      signal: AbortSignal.timeout(8000),
+    });
+    const text = await r.text();
+    let j;
+    try { j = JSON.parse(text); } catch(e) { throw new Error('Server error'); }
+    if (!j.ok) throw new Error(j.error || 'Delete failed');
+
+    // If we just deleted the active form, create a new one
+    if (id === FORM_ID) newForm();
+
+    toast('Form deleted');
+    loadFormsList(); // refresh list
+  } catch(e) {
+    toast('Delete failed: ' + e.message);
+  }
+}
+
+function newForm() {
+  // Generate a fresh UUID and clear the builder
+  const newId = generateUUID();
+  setActiveFormId(newId);
+  localStorage.setItem('fd_form_uuid', newId);
+
+  document.getElementById('form-title').value = 'My Form';
+  document.getElementById('form-desc').value = '';
+  qs = [];
+  qIdx = 0;
+  renderBuild();
+  switchTab('build');
+  toast('New form started');
+}
 
 /* ============================================================
    QUESTION CRUD
@@ -1013,6 +1228,9 @@ async function loadServerConfig() {
       status.className = 'email-status ok';
       status.textContent = '✓ Server connected: ' + _serverUrl + (j.derived ? ' (auto-detected)' : '');
       document.getElementById('test-btn').style.display = '';
+      // If currently on the forms tab, load list now that we have a server URL
+      const formsSection = document.getElementById('sec-forms');
+      if (formsSection && formsSection.classList.contains('active')) loadFormsList();
     } else {
       throw new Error('No server URL returned');
     }
@@ -1032,9 +1250,9 @@ function saveConfig() {
 
 function getFormPayload() {
   return {
-    id: FORM_ID,
-    title: document.getElementById('form-title').value || 'My Form',
-    desc: document.getElementById('form-desc').value || '',
+    id: FORM_ID,  // always uses the current active form ID
+    title: document.getElementById('form-title').value.trim() || 'My Form',
+    desc: document.getElementById('form-desc').value.trim() || '',
     questions: qs.map(q => ({ ...q })),
   };
 }
@@ -1245,7 +1463,7 @@ function renderPreview() {
    TABS
    ============================================================ */
 function switchTab(name) {
-  const tabNames = ['build','email','share','preview'];
+  const tabNames = ['forms','build','email','share','preview'];
   // Desktop tabs
   document.querySelectorAll('.tab-btn').forEach((b, i) => b.classList.toggle('active', tabNames[i] === name));
   // Mobile bottom nav
@@ -1255,8 +1473,8 @@ function switchTab(name) {
   // Sections
   document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
   document.getElementById('sec-' + name).classList.add('active');
-  // Scroll to top on tab switch (feels native)
   window.scrollTo({ top: 0, behavior: 'smooth' });
+  if (name === 'forms') loadFormsList();
   if (name === 'share') refreshShare();
   if (name === 'preview') renderPreview();
 }
