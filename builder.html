@@ -755,15 +755,28 @@ header {
 
 /* ── PRINT ───────────────────────────────────────────────── */
 @media print {
+  /* Hide everything that isn't the form content */
   header, .tabs, .mobile-nav, .header-actions, .add-q-bar,
   .share-grid, .email-config-card, .steps-list,
-  .toast, #sec-email, #sec-share,
+  .toast, #sec-email, #sec-share, #sec-forms, #sec-preview,
   .q-top, .q-delete, .q-type-select, .q-required-toggle,
-  .preview-bar, .pv-submit { display: none !important; }
+  .preview-bar, .pv-submit,
+  /* AI panel and backdrop — always hide on print */
+  .ai-panel, .ai-backdrop,
+  /* Cover editor UI — only the form fields print, not the editor chrome */
+  .cover-editor-header, .cover-preview-mini,
+  /* Section action row */
+  .q-card.section-card .q-top { display: none !important; }
+
   body { background: #fff; font-size: 13pt; color: #000; }
   .main { max-width: 100%; padding: 0; margin: 0; }
+
+  /* Force build section visible regardless of which tab is active */
   #sec-build { display: block !important; }
-  #sec-preview, #sec-share, #sec-email { display: none !important; }
+  /* Hide the live questions list — printForm() injects a clean print overlay */
+  #questions-list { display: none !important; }
+  /* Hide cover editor body UI (inputs shown via print overlay, not the editor) */
+  .cover-editor-body { display: none !important; }
   /* Cover page */
   .print-cover { display: block !important; page-break-after: always; min-height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 3cm 2cm; }
   .print-cover-logo { max-width: 160pt; max-height: 100pt; object-fit: contain; margin-bottom: 32pt; }
@@ -1679,6 +1692,18 @@ function printForm() {
   const formTitle = document.getElementById('form-title').value || 'My Form';
   const formDesc = document.getElementById('form-desc').value || '';
 
+  // Remember which tab is active so we can restore it after printing
+  const activeSection = document.querySelector('.section.active');
+  const activeSectionId = activeSection ? activeSection.id : 'sec-build';
+
+  // Switch to build tab — print CSS relies on #sec-build being in the DOM flow
+  // We do it silently without calling switchTab() to avoid scroll/side effects
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.getElementById('sec-build').classList.add('active');
+
+  // Close AI panel if open
+  closeAI();
+
   const printId = 'print-q-overlay';
   const existing = document.getElementById(printId);
   if (existing) existing.remove();
@@ -1693,15 +1718,21 @@ function printForm() {
   style.id = 'print-override';
   style.textContent = `
     @media print {
-      #questions-list { display: none !important; }
-      .cover-editor { display: none !important; }
       #${printId} { display: block !important; }
-      .add-q-bar { display: none !important; }
     }
   `;
   document.head.appendChild(style);
+
   window.print();
-  setTimeout(() => { printDiv.remove(); style.remove(); }, 1200);
+
+  // Restore previous tab and clean up
+  setTimeout(() => {
+    printDiv.remove();
+    style.remove();
+    // Restore whatever tab the user was on
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    document.getElementById(activeSectionId).classList.add('active');
+  }, 1200);
 }
 
 /* ============================================================
