@@ -129,6 +129,21 @@ button, select, input, textarea {
   padding-right: 36px;
 }
 
+/* ── SECTION DIVIDER ─────────────────────────────────────── */
+.q-section {
+  padding: 1rem 0 0.25rem;
+  border-top: 2px solid var(--accent);
+  margin-top: 0.5rem;
+}
+.q-section-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--accent-text);
+  margin-bottom: 3px;
+  line-height: 1.3;
+}
+.q-section-desc { font-size: 13px; color: var(--text2); line-height: 1.5; }
+
 /* ── OPTIONS ─────────────────────────────────────────────── */
 .q-options { display: flex; flex-direction: column; gap: 9px; }
 .q-option {
@@ -368,6 +383,11 @@ button, select, input, textarea {
 }
 
 /* ── Very small (≤ 390px) ────────────────────────────────── */
+@media (max-width: 768px) {
+  .q-section { padding: 0.75rem 1rem 0.25rem; margin: 0 0 0; }
+  .q-section-title { font-size: 15px; }
+}
+
 @media (max-width: 390px) {
   .form-title { font-size: 20px; }
   .q-label { font-size: 14px; }
@@ -481,9 +501,19 @@ function renderForm(data) {
   document.title = (data.title || 'Form') + ' — FormDrop';
   const hasRequired = data.questions.some(q => q.required);
 
+  let qCount = 0;
   const fields = data.questions.map((q, i) => {
+    // Section divider — not a question
+    if (q.type === 'section') {
+      return `<div class="q-section">
+        ${q.title ? `<div class="q-section-title">${esc(q.title)}</div>` : ''}
+        ${q.desc ? `<div class="q-section-desc">${esc(q.desc)}</div>` : ''}
+      </div>`;
+    }
+
+    qCount++;
     const req = q.required ? `<span class="req">*</span>` : '';
-    const lbl = q.label || `Question ${i+1}`;
+    const lbl = q.label || `Question ${qCount}`;
     let inp = '';
 
     if (q.type === 'short') inp = `<input type="text" id="ans-${q.id}" placeholder="Your answer"/>`;

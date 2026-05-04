@@ -422,6 +422,268 @@ header {
 .step { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; color: var(--text2); line-height: 1.5; }
 .step-num { min-width: 22px; height: 22px; background: var(--surface2); border: 1px solid var(--border); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; color: var(--text); flex-shrink: 0; margin-top: 1px; }
 
+/* ── SECTION CARDS ───────────────────────────────────────── */
+.q-card.section-card {
+  background: linear-gradient(135deg, var(--accent-light) 0%, var(--surface) 100%);
+  border: 1.5px solid var(--accent);
+  border-left: 4px solid var(--accent);
+  border-radius: var(--radius-lg);
+}
+.section-title-input {
+  width: 100%;
+  font-size: 17px;
+  font-weight: 700;
+  border: none;
+  border-bottom: 1px solid transparent;
+  background: transparent;
+  color: var(--accent-text);
+  outline: none;
+  padding: 2px 0;
+  transition: border-color 0.15s;
+  letter-spacing: -0.2px;
+}
+.section-title-input:focus { border-bottom-color: var(--accent); }
+.section-title-input::placeholder { color: var(--accent); opacity: 0.5; font-weight: 500; }
+.section-desc-input {
+  width: 100%;
+  font-size: 13px;
+  border: none;
+  background: transparent;
+  color: var(--text2);
+  outline: none;
+  resize: none;
+  min-height: 24px;
+  padding: 4px 0 0;
+}
+.section-desc-input::placeholder { color: var(--text3); }
+
+/* ── COVER PAGE EDITOR ────────────────────────────────────── */
+.cover-editor {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  margin-bottom: 1.5rem;
+  overflow: hidden;
+}
+.cover-editor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.9rem 1.25rem;
+  background: var(--surface2);
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  user-select: none;
+}
+.cover-editor-title { font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.cover-editor-toggle { font-size: 12px; color: var(--text2); }
+.cover-editor-body { padding: 1.25rem; display: flex; flex-direction: column; gap: 12px; }
+.cover-editor-body.hidden { display: none; }
+.cover-field label { display: block; font-size: 12px; font-weight: 500; color: var(--text2); margin-bottom: 5px; letter-spacing: 0.3px; text-transform: uppercase; }
+.cover-input {
+  width: 100%;
+  font-size: 14px;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.15s;
+}
+.cover-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(42,92,69,0.08); }
+.cover-input::placeholder { color: var(--text3); }
+.cover-textarea { resize: vertical; min-height: 70px; }
+.cover-logo-wrap { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.cover-logo-preview {
+  width: 80px; height: 60px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  object-fit: contain;
+  background: var(--surface2);
+  display: none;
+}
+.cover-logo-preview.show { display: block; }
+.cover-logo-btn {
+  font-size: 13px;
+  font-weight: 500;
+  padding: 8px 16px;
+  border: 1px dashed var(--border2);
+  border-radius: 8px;
+  background: var(--surface2);
+  color: var(--text2);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.cover-logo-btn:hover { border-color: var(--accent); color: var(--accent); }
+.cover-preview-mini {
+  margin-top: 8px;
+  background: linear-gradient(135deg, #1d3f2f 0%, #2a5c45 100%);
+  border-radius: 10px;
+  padding: 1.5rem;
+  text-align: center;
+  color: #fff;
+  display: none;
+}
+.cover-preview-mini.show { display: block; }
+.cover-preview-mini img { max-height: 50px; object-fit: contain; margin-bottom: 10px; display: block; margin-left: auto; margin-right: auto; }
+.cover-preview-mini .cpm-title { font-size: 18px; font-weight: 700; line-height: 1.2; margin-bottom: 4px; word-break: break-word; }
+.cover-preview-mini .cpm-sub { font-size: 13px; opacity: 0.8; margin-bottom: 4px; word-break: break-word; }
+.cover-preview-mini .cpm-date { font-size: 11px; opacity: 0.6; }
+
+/* ── AI PANEL ─────────────────────────────────────────────── */
+.ai-panel {
+  position: fixed;
+  right: 0; top: 0; bottom: 0;
+  width: 380px;
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  z-index: 500;
+  transform: translateX(100%);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: -4px 0 24px rgba(0,0,0,0.08);
+}
+.ai-panel.open { transform: translateX(0); }
+.ai-panel-header {
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--surface);
+  flex-shrink: 0;
+}
+.ai-panel-title { font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.ai-panel-title span { font-size: 18px; }
+.ai-close {
+  background: none; border: none; cursor: pointer;
+  color: var(--text3); font-size: 22px; line-height: 1;
+  width: 32px; height: 32px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s, color 0.15s;
+}
+.ai-close:hover { background: var(--surface2); color: var(--text); }
+.ai-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  scroll-behavior: smooth;
+}
+.ai-msg {
+  max-width: 92%;
+  padding: 10px 13px;
+  border-radius: 14px;
+  font-size: 13.5px;
+  line-height: 1.55;
+  word-break: break-word;
+}
+.ai-msg.user {
+  align-self: flex-end;
+  background: var(--accent);
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+.ai-msg.assistant {
+  align-self: flex-start;
+  background: var(--surface2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-bottom-left-radius: 4px;
+}
+.ai-msg.thinking {
+  align-self: flex-start;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text3);
+  font-style: italic;
+  font-size: 13px;
+  border-bottom-left-radius: 4px;
+}
+.ai-suggestions {
+  padding: 0 1rem 0.75rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.ai-suggestion {
+  font-size: 12px;
+  padding: 5px 12px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--surface2);
+  color: var(--text2);
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.ai-suggestion:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-light); }
+.ai-input-area {
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--border);
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  flex-shrink: 0;
+  padding-bottom: calc(0.75rem + var(--safe-bottom));
+  background: var(--surface);
+}
+.ai-textarea {
+  flex: 1;
+  font-size: 14px;
+  padding: 10px 12px;
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg);
+  color: var(--text);
+  outline: none;
+  resize: none;
+  min-height: 44px;
+  max-height: 120px;
+  transition: border-color 0.15s;
+  line-height: 1.4;
+}
+.ai-textarea:focus { border-color: var(--accent); }
+.ai-textarea::placeholder { color: var(--text3); }
+.ai-send {
+  width: 42px; height: 42px;
+  background: var(--accent);
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.15s, transform 0.1s;
+}
+.ai-send:hover { background: #1d3f2f; }
+.ai-send:active { transform: scale(0.93); }
+.ai-send svg { width: 18px; height: 18px; fill: #fff; }
+.ai-send:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* AI backdrop on mobile */
+.ai-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.3);
+  z-index: 499;
+}
+.ai-backdrop.show { display: block; }
+
+/* AI button in header */
+.btn-ai {
+  background: linear-gradient(135deg, #2a5c45 0%, #4a9e7d 100%);
+  color: #fff;
+  border-color: transparent;
+  gap: 5px;
+}
+.btn-ai:hover { background: linear-gradient(135deg, #1d3f2f 0%, #2a5c45 100%); }
+
 /* ── FORMS LIST ──────────────────────────────────────────── */
 .form-list-item {
   background: var(--surface);
@@ -502,20 +764,39 @@ header {
   .main { max-width: 100%; padding: 0; margin: 0; }
   #sec-build { display: block !important; }
   #sec-preview, #sec-share, #sec-email { display: none !important; }
+  /* Cover page */
+  .print-cover { display: block !important; page-break-after: always; min-height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 3cm 2cm; }
+  .print-cover-logo { max-width: 160pt; max-height: 100pt; object-fit: contain; margin-bottom: 32pt; }
+  .print-cover-title { font-size: 32pt; font-weight: 700; color: #000; line-height: 1.2; word-break: break-word; white-space: normal; margin-bottom: 12pt; }
+  .print-cover-subtitle { font-size: 16pt; color: #444; margin-bottom: 8pt; word-break: break-word; white-space: normal; }
+  .print-cover-date { font-size: 11pt; color: #888; margin-bottom: 24pt; }
+  .print-cover-desc { font-size: 12pt; color: #555; line-height: 1.7; max-width: 440pt; word-break: break-word; white-space: normal; }
+  .print-cover-line { width: 60pt; height: 3pt; background: #2a5c45; margin: 20pt auto; border-radius: 2pt; }
+
+  /* Form title — wraps, never clips */
   .form-title-wrap { margin-bottom: 1.5rem; border-bottom: 2px solid #000; padding-bottom: 0.75rem; }
-  .form-title-input { font-size: 22pt; font-weight: 700; border: none; padding: 0; pointer-events: none; }
-  .form-desc-input { font-size: 11pt; color: #444; pointer-events: none; }
+  .form-title-input {
+    font-size: 22pt; font-weight: 700; border: none; padding: 0; pointer-events: none;
+    white-space: normal !important; overflow: visible !important; text-overflow: unset !important;
+    word-break: break-word; line-height: 1.25;
+  }
+  .form-desc-input { font-size: 11pt; color: #444; pointer-events: none; white-space: normal; word-break: break-word; }
+
   .questions { gap: 18pt; }
-  .q-card { border: none; border-bottom: 1px solid #ddd; border-radius: 0; padding: 0 0 14pt 0; page-break-inside: avoid; box-shadow: none !important; }
-  .q-label-input { font-size: 12pt; font-weight: 600; border: none; pointer-events: none; padding: 0 0 6pt 0; display: block; }
+  .q-card { border: none; border-radius: 0; padding: 0 0 14pt 0; page-break-inside: avoid; box-shadow: none !important; }
+  /* Section cards print as bold headings */
+  .q-card.section-card { border-bottom: 2px solid #000; padding-bottom: 8pt; margin-top: 8pt; }
+  .section-title-input { font-size: 14pt !important; font-weight: 700 !important; color: #000 !important; }
+  .section-desc-input { font-size: 10pt !important; color: #555 !important; }
+  .q-label-input { font-size: 12pt; font-weight: 600; border: none; pointer-events: none; padding: 0 0 6pt 0; display: block; white-space: normal; word-break: break-word; }
   .print-answer-line { display: block; border-bottom: 1px solid #aaa; width: 100%; height: 28pt; margin-top: 4pt; }
   .print-answer-box { display: block; border: 1px solid #aaa; width: 100%; height: 64pt; margin-top: 4pt; border-radius: 3pt; }
   .print-options { margin-top: 6pt; display: flex; flex-direction: column; gap: 7pt; }
   .print-option { display: flex; align-items: center; gap: 8pt; font-size: 11pt; }
   .print-option-circle { width: 14pt; height: 14pt; border: 1.5pt solid #555; border-radius: 50%; flex-shrink: 0; }
   .print-option-square { width: 13pt; height: 13pt; border: 1.5pt solid #555; border-radius: 2pt; flex-shrink: 0; }
-  .print-option-label { font-size: 11pt; }
-  .print-dropdown-opts { margin-top: 4pt; font-size: 11pt; color: #444; }
+  .print-option-label { font-size: 11pt; word-break: break-word; }
+  .print-dropdown-opts { margin-top: 4pt; font-size: 11pt; color: #444; word-break: break-word; }
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -716,6 +997,77 @@ header {
   .save-status { font-size: 13px; padding: 10px 14px; border-radius: 10px; }
 }
 
+  /* ── Cover editor on mobile ── */
+  .cover-editor { margin-bottom: 12px; border-radius: var(--radius-lg); }
+  .cover-editor-header { padding: 0.85rem 1rem; }
+  .cover-editor-title { font-size: 13px; }
+  .cover-editor-body { padding: 1rem; gap: 10px; }
+  .cover-field label { font-size: 11px; }
+  .cover-input { font-size: 16px; padding: 11px 12px; min-height: 48px; border-radius: 10px; }
+  .cover-textarea { min-height: 80px; font-size: 16px; }
+  .cover-logo-btn { min-height: 44px; width: 100%; text-align: center; border-radius: 10px; }
+  .cover-logo-wrap { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .cover-logo-preview { width: 100%; height: 80px; }
+
+  /* ── Section cards on mobile ── */
+  .q-card.section-card { padding: 0.9rem 1rem; }
+  .section-title-input { font-size: 16px; min-height: 44px; padding: 6px 0; }
+  .section-desc-input { font-size: 14px; min-height: 36px; }
+
+  /* ── AI panel — full screen on mobile ── */
+  .ai-panel {
+    width: 100%;
+    top: 0;
+    border-left: none;
+    border-top: none;
+    /* Slide up from bottom on mobile */
+    top: auto;
+    bottom: 0;
+    height: 92vh;
+    border-radius: 20px 20px 0 0;
+    transform: translateY(100%);
+    box-shadow: 0 -8px 40px rgba(0,0,0,0.15);
+  }
+  .ai-panel.open { transform: translateY(0); }
+  .ai-panel-header {
+    padding: 1rem 1.25rem 0.75rem;
+    border-radius: 20px 20px 0 0;
+  }
+  /* Drag handle on mobile */
+  .ai-panel-header::before {
+    content: '';
+    display: block;
+    width: 36px; height: 4px;
+    background: var(--border2);
+    border-radius: 2px;
+    margin: 0 auto 0.75rem;
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+  .ai-panel-header { position: relative; }
+  .ai-messages { padding: 0.75rem; gap: 10px; }
+  .ai-msg { font-size: 14px; padding: 10px 13px; }
+  .ai-suggestions {
+    padding: 0 0.75rem 0.5rem;
+    gap: 5px;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .ai-suggestions::-webkit-scrollbar { display: none; }
+  .ai-suggestion { white-space: nowrap; flex-shrink: 0; font-size: 12px; min-height: 34px; }
+  .ai-input-area {
+    padding: 0.75rem;
+    padding-bottom: calc(0.75rem + var(--safe-bottom));
+    gap: 8px;
+  }
+  .ai-textarea { font-size: 16px; border-radius: 14px; padding: 11px 13px; }
+  .ai-send { width: 46px; height: 46px; border-radius: 14px; }
+  .ai-send svg { width: 20px; height: 20px; }
+
 /* ── Very small phones (≤ 390px) ─────────────────────────── */
 @media (max-width: 390px) {
   .main { padding-left: 0.75rem; padding-right: 0.75rem; }
@@ -723,6 +1075,8 @@ header {
   .add-q-type { flex: 1 1 100%; }
   .mobile-nav-item { font-size: 9.5px; }
   .mobile-nav-item svg { width: 20px; height: 20px; }
+  .ai-panel { height: 96vh; }
+  .cover-preview-mini .cpm-title { font-size: 15px; }
 }
 </style>
 </head>
@@ -735,6 +1089,7 @@ header {
   </div>
   <!-- Desktop header actions -->
   <div class="header-actions">
+    <button class="btn btn-ai" onclick="openAI()">✦ AI</button>
     <button class="btn" onclick="printForm()" title="Export as printable PDF">🖨 Print</button>
     <button class="btn" onclick="window.open('analytics.html','_blank')">Analytics</button>
     <button class="btn" onclick="switchTab('preview')">Preview</button>
@@ -763,6 +1118,10 @@ header {
   <button class="mobile-nav-item" id="nav-preview" onclick="switchTab('preview')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
     Preview
+  </button>
+  <button class="mobile-nav-item" id="nav-ai" onclick="openAI()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 0 2h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1 0-2h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z"/><circle cx="9" cy="14" r="1"/><circle cx="15" cy="14" r="1"/></svg>
+    AI
   </button>
   <button class="mobile-nav-item" id="nav-analytics" onclick="window.open('analytics.html','_blank')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
@@ -803,9 +1162,52 @@ header {
       <input class="form-title-input" id="form-title" type="text" placeholder="Untitled form" value="My Form"/>
       <textarea class="form-desc-input" id="form-desc" placeholder="Add a description (optional)" rows="1"></textarea>
     </div>
+
+    <!-- COVER PAGE EDITOR -->
+    <div class="cover-editor" id="cover-editor">
+      <div class="cover-editor-header" onclick="toggleCoverEditor()">
+        <div class="cover-editor-title">📄 Cover page <span style="font-size:12px;font-weight:400;color:var(--text3);margin-left:6px;">optional, prints before questions</span></div>
+        <span class="cover-editor-toggle" id="cover-toggle-label">+ Add cover</span>
+      </div>
+      <div class="cover-editor-body hidden" id="cover-editor-body">
+        <div class="cover-field">
+          <label>Logo / Image</label>
+          <div class="cover-logo-wrap">
+            <img id="cover-logo-preview" class="cover-logo-preview" src="" alt="Logo"/>
+            <button class="cover-logo-btn" onclick="document.getElementById('cover-logo-file').click()">📎 Upload image</button>
+            <button class="cover-logo-btn" onclick="removeLogo()" id="remove-logo-btn" style="display:none;color:var(--danger);">✕ Remove</button>
+            <input type="file" id="cover-logo-file" accept="image/*" style="display:none" onchange="handleLogoUpload(this)"/>
+          </div>
+        </div>
+        <div class="cover-field">
+          <label>Headline</label>
+          <input class="cover-input" id="cover-headline" type="text" placeholder="e.g. Customer Satisfaction Survey" oninput="updateCoverPreview()"/>
+        </div>
+        <div class="cover-field">
+          <label>Subtitle</label>
+          <input class="cover-input" id="cover-subtitle" type="text" placeholder="e.g. Q1 2025 · Acme Corp" oninput="updateCoverPreview()"/>
+        </div>
+        <div class="cover-field">
+          <label>Date</label>
+          <input class="cover-input" id="cover-date" type="text" placeholder="e.g. May 2025" oninput="updateCoverPreview()"/>
+        </div>
+        <div class="cover-field">
+          <label>Description / Instructions</label>
+          <textarea class="cover-input cover-textarea" id="cover-desc" placeholder="Any instructions or context for respondents…" oninput="updateCoverPreview()"></textarea>
+        </div>
+        <!-- Live mini preview -->
+        <div class="cover-preview-mini" id="cover-preview-mini">
+          <img id="cover-mini-logo" src="" alt=""/>
+          <div class="cpm-title" id="cpm-title"></div>
+          <div class="cpm-sub" id="cpm-sub"></div>
+          <div class="cpm-date" id="cpm-date"></div>
+        </div>
+      </div>
+    </div>
+
     <div class="questions" id="questions-list"></div>
     <div class="add-q-bar">
-      <span>Add question</span>
+      <span>Add question or section</span>
       <button class="add-q-type" onclick="addQ('short')">Short answer</button>
       <button class="add-q-type" onclick="addQ('long')">Long answer</button>
       <button class="add-q-type" onclick="addQ('radio')">Multiple choice</button>
@@ -814,6 +1216,7 @@ header {
       <button class="add-q-type" onclick="addQ('email')">Email</button>
       <button class="add-q-type" onclick="addQ('number')">Number</button>
       <button class="add-q-type" onclick="addQ('date')">Date</button>
+      <button class="add-q-type" onclick="addSection()" style="border-color:var(--accent);color:var(--accent);">§ Section</button>
     </div>
   </div>
 
@@ -895,6 +1298,38 @@ header {
 </div>
 
 <div class="toast" id="toast"></div>
+
+<!-- AI backdrop -->
+<div class="ai-backdrop" id="ai-backdrop" onclick="closeAI()"></div>
+
+<!-- AI Panel -->
+<div class="ai-panel" id="ai-panel">
+  <div class="ai-panel-header">
+    <div class="ai-panel-title"><span>✦</span> AI Assistant</div>
+    <button class="ai-close" onclick="closeAI()">×</button>
+  </div>
+  <div class="ai-messages" id="ai-messages">
+    <div class="ai-msg assistant">Hi! I can help you build and improve your form. You can:
+      <br><br>• <strong>Paste any text</strong> and I'll generate questions from it
+      <br>• <strong>Ask me to make changes</strong> like "add a section about experience" or "make question 2 required"
+      <br>• <strong>Write a cover page</strong> — just describe what you need</div>
+  </div>
+  <div class="ai-suggestions" id="ai-suggestions">
+    <button class="ai-suggestion" onclick="aiSuggest(this)">Generate form from my text</button>
+    <button class="ai-suggestion" onclick="aiSuggest(this)">Add a new section</button>
+    <button class="ai-suggestion" onclick="aiSuggest(this)">Write a cover page for me</button>
+    <button class="ai-suggestion" onclick="aiSuggest(this)">Make all questions required</button>
+    <button class="ai-suggestion" onclick="aiSuggest(this)">Improve my question labels</button>
+  </div>
+  <div class="ai-input-area">
+    <textarea class="ai-textarea" id="ai-input" placeholder="Ask anything or paste text to generate questions…" rows="1"
+      onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendAI();}"
+      oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea>
+    <button class="ai-send" id="ai-send-btn" onclick="sendAI()" title="Send">
+      <svg viewBox="0 0 24 24"><path d="M22 2L11 13"/><path d="M22 2L15 22 11 13 2 9l20-7z"/></svg>
+    </button>
+  </div>
+</div>
 
 <script>
 /* ============================================================
@@ -1098,8 +1533,20 @@ function removeOption(id, i) { const q = qs.find(q => q.id === id); if (q && q.o
 function esc(s) { return String(s || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 function typeLabel(t) {
-  return {short:'Short answer',long:'Paragraph',radio:'Multiple choice',checkbox:'Checkboxes',dropdown:'Dropdown',email:'Email',number:'Number',date:'Date'}[t] || t;
+  return {short:'Short answer',long:'Paragraph',radio:'Multiple choice',checkbox:'Checkboxes',dropdown:'Dropdown',email:'Email',number:'Number',date:'Date',section:'Section'}[t] || t;
 }
+
+function addSection() {
+  const s = { id: uid(), type: 'section', title: '', desc: '' };
+  qs.push(s);
+  renderBuild();
+  setTimeout(() => {
+    const el = document.querySelector(`#card-${s.id} .section-title-input`);
+    if (el) el.focus();
+  }, 50);
+}
+function setSectionTitle(id, v) { const q = qs.find(q => q.id === id); if (q) q.title = v; }
+function setSectionDesc(id, v) { const q = qs.find(q => q.id === id); if (q) q.desc = v; }
 
 function renderBuild() {
   const el = document.getElementById('questions-list');
@@ -1107,7 +1554,27 @@ function renderBuild() {
     el.innerHTML = `<div class="empty"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="3"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="16" x2="12" y2="16"/></svg><br>No questions yet — use the buttons below to add some.</div>`;
     return;
   }
+  // Question counter — sections don't count
+  let qNum = 0;
   el.innerHTML = qs.map((q, i) => {
+    // ── SECTION ──
+    if (q.type === 'section') {
+      return `<div class="q-card section-card" id="card-${q.id}">
+        <div class="q-top">
+          <span style="font-size:11px;font-weight:700;color:var(--accent);letter-spacing:0.5px;text-transform:uppercase;">Section</span>
+          <button class="q-delete" onclick="removeQ('${q.id}')" title="Delete section" style="margin-left:auto">×</button>
+        </div>
+        <input class="section-title-input" placeholder="Section title" value="${esc(q.title||'')}"
+          onchange="setSectionTitle('${q.id}',this.value)"
+          onfocus="this.closest('.q-card').classList.add('focused')"
+          onblur="this.closest('.q-card').classList.remove('focused')"/>
+        <textarea class="section-desc-input" placeholder="Section description (optional)" rows="1"
+          onchange="setSectionDesc('${q.id}',this.value)">${esc(q.desc||'')}</textarea>
+      </div>`;
+    }
+
+    // ── QUESTION ──
+    qNum++;
     const hasOpts = q.options !== undefined;
     const optIco = q.type === 'checkbox' ? 'sq' : '';
     const optsHtml = hasOpts ? `
@@ -1127,12 +1594,12 @@ function renderBuild() {
 
     return `<div class="q-card" id="card-${q.id}">
       <div class="q-top">
-        <span class="q-num">${i+1}</span>
+        <span class="q-num">${qNum}</span>
         <select class="q-type-select" onchange="setType('${q.id}',this.value)">${typeSel}</select>
         <label class="q-required-toggle"><input type="checkbox" ${q.required?'checked':''} onchange="setRequired('${q.id}',this.checked)"> Required</label>
         <button class="q-delete" onclick="removeQ('${q.id}')" title="Delete question">×</button>
       </div>
-      <input class="q-label-input" placeholder="Question ${i+1}" value="${esc(q.label)}"
+      <input class="q-label-input" placeholder="Question ${qNum}" value="${esc(q.label||'')}"
         onchange="setLabel('${q.id}',this.value)"
         onfocus="this.closest('.q-card').classList.add('focused')"
         onblur="this.closest('.q-card').classList.remove('focused')"/>
@@ -1142,24 +1609,49 @@ function renderBuild() {
 }
 
 /* ============================================================
-   PRINT / PDF EXPORT
+   PRINT / PDF EXPORT — with cover page and sections
    ============================================================ */
-function printForm() {
-  // Temporarily inject printable question markup into the build section
-  // so @media print picks it up cleanly.
-  const printId = 'print-q-overlay';
-  let existing = document.getElementById(printId);
-  if (existing) existing.remove();
+function getCoverData() {
+  return {
+    headline: document.getElementById('cover-headline')?.value.trim() || '',
+    subtitle: document.getElementById('cover-subtitle')?.value.trim() || '',
+    date: document.getElementById('cover-date')?.value.trim() || '',
+    desc: document.getElementById('cover-desc')?.value.trim() || '',
+    logo: document.getElementById('cover-logo-preview')?.src || '',
+    hasLogo: document.getElementById('cover-logo-preview')?.classList.contains('show') || false,
+  };
+}
 
-  const printDiv = document.createElement('div');
-  printDiv.id = printId;
-  printDiv.style.display = 'none'; // only shown in print media
+function buildCoverHTML(cover, formTitle, formDesc) {
+  const hasAny = cover.headline || cover.subtitle || cover.date || cover.desc || cover.hasLogo;
+  if (!hasAny) return '';
+  const headline = cover.headline || formTitle || 'Form';
+  const logoHtml = cover.hasLogo && cover.logo
+    ? `<img class="print-cover-logo" src="${cover.logo}" alt="Logo"/>`
+    : '';
+  return `<div class="print-cover">
+    ${logoHtml}
+    <div class="print-cover-line"></div>
+    <div class="print-cover-title">${esc(headline)}</div>
+    ${cover.subtitle ? `<div class="print-cover-subtitle">${esc(cover.subtitle)}</div>` : ''}
+    ${cover.date ? `<div class="print-cover-date">${esc(cover.date)}</div>` : ''}
+    ${cover.desc ? `<div class="print-cover-desc">${esc(cover.desc)}</div>` : ''}
+  </div>`;
+}
 
-  const items = qs.map((q, i) => {
-    const label = q.label || `Question ${i+1}`;
+function buildPrintQuestions() {
+  let qNum = 0;
+  return qs.map((q) => {
+    if (q.type === 'section') {
+      return `<div class="q-card section-card" style="page-break-inside:avoid;page-break-before:auto">
+        <input class="section-title-input" value="${esc(q.title||'Section')}" readonly style="pointer-events:none"/>
+        ${q.desc ? `<div class="section-desc-input" style="pointer-events:none;font-size:10pt;color:#555;">${esc(q.desc)}</div>` : ''}
+      </div>`;
+    }
+    qNum++;
+    const label = q.label || `Question ${qNum}`;
     const reqMark = q.required ? ' <span style="color:#c0392b">*</span>' : '';
     let answerHtml = '';
-
     if (['short','email','number','date'].includes(q.type)) {
       answerHtml = `<span class="print-answer-line"></span>`;
     } else if (q.type === 'long') {
@@ -1175,41 +1667,93 @@ function printForm() {
     } else if (q.type === 'dropdown') {
       answerHtml = `<div class="print-dropdown-opts">Options: ${(q.options||[]).map(o => esc(o)).join(' · ')}</div><span class="print-answer-line"></span>`;
     }
-
     return `<div class="q-card" style="page-break-inside:avoid">
-      <input class="q-label-input" value="${esc(label)}" readonly style="font-weight:600"/>
+      <input class="q-label-input" value="${esc(label)}${reqMark}" readonly style="font-weight:600;white-space:normal;word-break:break-word;pointer-events:none"/>
       ${answerHtml}
     </div>`;
   }).join('');
+}
 
-  printDiv.innerHTML = items;
+function printForm() {
+  const cover = getCoverData();
+  const formTitle = document.getElementById('form-title').value || 'My Form';
+  const formDesc = document.getElementById('form-desc').value || '';
 
-  // Insert after the questions-list so print CSS sees it as part of sec-build
+  const printId = 'print-q-overlay';
+  const existing = document.getElementById(printId);
+  if (existing) existing.remove();
+
+  const printDiv = document.createElement('div');
+  printDiv.id = printId;
+  printDiv.style.display = 'none';
+  printDiv.innerHTML = buildCoverHTML(cover, formTitle, formDesc) + buildPrintQuestions();
   document.getElementById('questions-list').after(printDiv);
 
-  // Temporarily hide the real questions list for print
-  const realList = document.getElementById('questions-list');
-  realList.dataset.printHide = '1';
-
-  // Inject a one-time print style to show printDiv and hide the real list
   const style = document.createElement('style');
   style.id = 'print-override';
   style.textContent = `
     @media print {
       #questions-list { display: none !important; }
+      .cover-editor { display: none !important; }
       #${printId} { display: block !important; }
       .add-q-bar { display: none !important; }
     }
   `;
   document.head.appendChild(style);
-
   window.print();
+  setTimeout(() => { printDiv.remove(); style.remove(); }, 1200);
+}
 
-  // Cleanup after print dialog closes
-  setTimeout(() => {
-    printDiv.remove();
-    style.remove();
-  }, 1000);
+/* ============================================================
+   COVER PAGE EDITOR
+   ============================================================ */
+let coverOpen = false;
+function toggleCoverEditor() {
+  coverOpen = !coverOpen;
+  document.getElementById('cover-editor-body').classList.toggle('hidden', !coverOpen);
+  document.getElementById('cover-toggle-label').textContent = coverOpen ? '− Hide' : '+ Add cover';
+}
+
+function handleLogoUpload(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = document.getElementById('cover-logo-preview');
+    const miniImg = document.getElementById('cover-mini-logo');
+    img.src = e.target.result;
+    img.classList.add('show');
+    if (miniImg) { miniImg.src = e.target.result; miniImg.style.display = 'block'; }
+    document.getElementById('remove-logo-btn').style.display = '';
+    updateCoverPreview();
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeLogo() {
+  const img = document.getElementById('cover-logo-preview');
+  img.src = ''; img.classList.remove('show');
+  const miniImg = document.getElementById('cover-mini-logo');
+  if (miniImg) { miniImg.src = ''; miniImg.style.display = 'none'; }
+  document.getElementById('cover-logo-file').value = '';
+  document.getElementById('remove-logo-btn').style.display = 'none';
+  updateCoverPreview();
+}
+
+function updateCoverPreview() {
+  const mini = document.getElementById('cover-preview-mini');
+  const headline = document.getElementById('cover-headline').value.trim();
+  const subtitle = document.getElementById('cover-subtitle').value.trim();
+  const date = document.getElementById('cover-date').value.trim();
+  const hasContent = headline || subtitle || date;
+  if (hasContent) {
+    mini.classList.add('show');
+    document.getElementById('cpm-title').textContent = headline || document.getElementById('form-title').value || 'My Form';
+    document.getElementById('cpm-sub').textContent = subtitle;
+    document.getElementById('cpm-date').textContent = date;
+  } else {
+    mini.classList.remove('show');
+  }
 }
 
 /* ============================================================
@@ -1432,6 +1976,12 @@ function renderPreview() {
   if (!qs.length) { el.innerHTML = '<div class="empty">No questions to preview.</div>'; return; }
 
   const fields = qs.map(q => {
+    if (q.type === 'section') {
+      return `<div style="border-left:3px solid var(--accent);padding:0.5rem 0 0.5rem 1rem;margin:0.5rem 0;">
+        <div style="font-size:16px;font-weight:700;color:var(--accent-text)">${esc(q.title||'Section')}</div>
+        ${q.desc ? `<div style="font-size:13px;color:var(--text2);margin-top:2px">${esc(q.desc)}</div>` : ''}
+      </div>`;
+    }
     const req = q.required ? `<span class="req">*</span>` : '';
     const lbl = q.label || 'Untitled question';
     let inp = '';
@@ -1457,6 +2007,190 @@ function renderPreview() {
     ${desc ? `<p class="pv-desc">${esc(desc)}</p>` : ''}
     <div class="pv-fields">${fields}</div>
     <button class="pv-submit" style="margin-top:1.5rem">Submit</button>`;
+}
+
+/* ============================================================
+   AI ASSISTANT
+   ============================================================ */
+let aiOpen = false;
+
+function openAI() {
+  aiOpen = true;
+  document.getElementById('ai-panel').classList.add('open');
+  document.getElementById('ai-backdrop').classList.add('show');
+  setTimeout(() => document.getElementById('ai-input').focus(), 300);
+}
+
+function closeAI() {
+  aiOpen = false;
+  document.getElementById('ai-panel').classList.remove('open');
+  document.getElementById('ai-backdrop').classList.remove('show');
+}
+
+function aiSuggest(btn) {
+  document.getElementById('ai-input').value = btn.textContent;
+  document.getElementById('ai-input').dispatchEvent(new Event('input'));
+  sendAI();
+}
+
+function addAIMessage(role, text) {
+  const msgs = document.getElementById('ai-messages');
+  const div = document.createElement('div');
+  div.className = 'ai-msg ' + role;
+  div.innerHTML = text.replace(/\n/g, '<br>');
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+  return div;
+}
+
+function getFormContext() {
+  const title = document.getElementById('form-title').value || 'My Form';
+  const desc = document.getElementById('form-desc').value || '';
+  const cover = getCoverData();
+  return {
+    title, desc,
+    cover: { headline: cover.headline, subtitle: cover.subtitle, date: cover.date, desc: cover.desc },
+    questions: qs.map(q => ({
+      id: q.id, type: q.type,
+      label: q.label || q.title || '',
+      required: q.required,
+      options: q.options,
+      desc: q.desc,
+    })),
+  };
+}
+
+function applyAIChanges(changes) {
+  if (!changes) return;
+
+  if (changes.formTitle !== undefined) {
+    document.getElementById('form-title').value = changes.formTitle;
+  }
+  if (changes.formDesc !== undefined) {
+    document.getElementById('form-desc').value = changes.formDesc;
+  }
+  if (changes.cover) {
+    const c = changes.cover;
+    if (!coverOpen) toggleCoverEditor();
+    if (c.headline !== undefined) document.getElementById('cover-headline').value = c.headline;
+    if (c.subtitle !== undefined) document.getElementById('cover-subtitle').value = c.subtitle;
+    if (c.date !== undefined) document.getElementById('cover-date').value = c.date;
+    if (c.desc !== undefined) document.getElementById('cover-desc').value = c.desc;
+    updateCoverPreview();
+  }
+  if (changes.questions) {
+    // Merge strategy: new questions get new IDs; existing ones matched by id get updated
+    const newQs = changes.questions.map(q => {
+      if (q.id && qs.find(e => e.id === q.id)) {
+        // Update existing
+        const existing = qs.find(e => e.id === q.id);
+        return { ...existing, ...q };
+      }
+      // New question — generate proper ID
+      return { ...q, id: q.id || uid() };
+    });
+    qs = newQs;
+    qIdx = qs.reduce((max, q) => {
+      const n = parseInt((q.id||'').replace('q',''), 10);
+      return isNaN(n) ? max : Math.max(max, n);
+    }, qIdx);
+    renderBuild();
+  }
+}
+
+async function sendAI() {
+  const input = document.getElementById('ai-input');
+  const userText = input.value.trim();
+  if (!userText) return;
+
+  input.value = '';
+  input.style.height = 'auto';
+  document.getElementById('ai-send-btn').disabled = true;
+
+  addAIMessage('user', userText);
+  // Hide suggestions after first message
+  document.getElementById('ai-suggestions').style.display = 'none';
+
+  const thinking = addAIMessage('thinking', '✦ Thinking…');
+
+  const formContext = getFormContext();
+  const systemPrompt = `You are an AI assistant built into FormDrop, a form builder app. Your job is to help the user build, edit, and improve their forms.
+
+The user's current form state is:
+${JSON.stringify(formContext, null, 2)}
+
+You can make changes to the form by returning a JSON "changes" object. You MUST respond with valid JSON in this exact format:
+{
+  "message": "A friendly plain-text explanation of what you did or are doing",
+  "changes": {
+    "formTitle": "optional new title",
+    "formDesc": "optional new description",
+    "cover": {
+      "headline": "optional cover headline",
+      "subtitle": "optional cover subtitle",
+      "date": "optional date text",
+      "desc": "optional cover description/instructions"
+    },
+    "questions": [
+      {
+        "id": "keep existing id to update, or new string like 'q_new_1' for new questions",
+        "type": "short|long|radio|checkbox|dropdown|email|number|date|section",
+        "label": "question label text (for questions)",
+        "title": "section title (for sections)",
+        "desc": "section description (for sections)",
+        "required": true,
+        "options": ["option1", "option2"]
+      }
+    ]
+  }
+}
+
+Rules:
+- "changes" can omit any key you're not changing — only include what actually changes
+- To ADD new questions, include them in the questions array with new IDs
+- To UPDATE existing questions, use their existing ID
+- To REPLACE all questions (e.g. generating from scratch), send the full array
+- If generating a form from pasted text, extract meaningful questions, use correct types, set required fields sensibly
+- Always respond with valid JSON only — no markdown, no backticks, no extra text`;
+
+  try {
+    // Route through /api/ai — Groq proxy keeps the API key server-side
+    const response = await fetch('/api/ai', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        systemPrompt,
+        userMessage: userText,
+      }),
+    });
+
+    const data = await response.json();
+    thinking.remove();
+
+    if (!response.ok) throw new Error(data.error?.message || 'API error');
+
+    const raw = data.content?.[0]?.text || '';
+    let parsed;
+    try {
+      // Strip any accidental markdown fences
+      const clean = raw.replace(/^```[a-z]*\n?/,'').replace(/\n?```$/,'').trim();
+      parsed = JSON.parse(clean);
+    } catch(e) {
+      addAIMessage('assistant', raw || 'Sorry, I couldn\'t process that. Try rephrasing.');
+      document.getElementById('ai-send-btn').disabled = false;
+      return;
+    }
+
+    addAIMessage('assistant', parsed.message || 'Done!');
+    if (parsed.changes && Object.keys(parsed.changes).length > 0) {
+      applyAIChanges(parsed.changes);
+    }
+  } catch(e) {
+    thinking.remove();
+    addAIMessage('assistant', 'Error: ' + e.message + '. Check your API key is configured.');
+  }
+
+  document.getElementById('ai-send-btn').disabled = false;
 }
 
 /* ============================================================

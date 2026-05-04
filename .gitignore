@@ -142,3 +142,5 @@ yarn-error.log*
 *.dll
 *.so
 *.dylib
+.vercel
+.env*.local
