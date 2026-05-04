@@ -1,10 +1,21 @@
 {
-  "name": "formdrop-server",
+  "name": "formdrop",
   "version": "2.0.0",
-  "description": "FormDrop — Vercel serverless + Postgres",
+  "description": "FormDrop — form builder with DB, email, and AI (Groq)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
   "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
     "nodemailer": "^6.9.13",
     "pg": "^8.11.5",
     "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
   }
 }
