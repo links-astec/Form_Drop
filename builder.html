@@ -1229,6 +1229,7 @@ header {
       <button class="add-q-type" onclick="addQ('email')">Email</button>
       <button class="add-q-type" onclick="addQ('number')">Number</button>
       <button class="add-q-type" onclick="addQ('date')">Date</button>
+      <button class="add-q-type" onclick="addQ('file')">📎 File upload</button>
       <button class="add-q-type" onclick="addSection()" style="border-color:var(--accent);color:var(--accent);">§ Section</button>
     </div>
   </div>
@@ -1521,6 +1522,7 @@ function uid() { return 'q' + (++qIdx); }
 function addQ(type) {
   const q = { id: uid(), type, label: '', required: false };
   if (['radio','checkbox','dropdown'].includes(type)) q.options = ['Option 1', 'Option 2'];
+  if (type === 'file') { q.fileTypes = 'any'; q.maxSizeMB = 10; }
   qs.push(q);
   renderBuild();
   setTimeout(() => {
@@ -1536,17 +1538,22 @@ function setType(id, t) {
   const q = qs.find(q => q.id === id); if (!q) return;
   q.type = t;
   if (['radio','checkbox','dropdown'].includes(t)) { if (!q.options) q.options = ['Option 1', 'Option 2']; }
-  else delete q.options;
+  else { delete q.options; delete q.allowOther; }
+  if (t === 'file') { q.fileTypes = q.fileTypes || 'any'; q.maxSizeMB = q.maxSizeMB || 10; }
+  else { delete q.fileTypes; delete q.maxSizeMB; }
   renderBuild();
 }
 function setOption(id, i, v) { const q = qs.find(q => q.id === id); if (q && q.options) q.options[i] = v; }
+function toggleAllowOther(id, val) { const q = qs.find(q => q.id === id); if (q) { q.allowOther = val; renderBuild(); } }
+function setFileTypes(id, v) { const q = qs.find(q => q.id === id); if (q) q.fileTypes = v; }
+function setMaxSize(id, v) { const q = qs.find(q => q.id === id); if (q) q.maxSizeMB = parseInt(v)||10; }
 function addOption(id) { const q = qs.find(q => q.id === id); if (q && q.options) { q.options.push('Option ' + (q.options.length + 1)); renderBuild(); }}
 function removeOption(id, i) { const q = qs.find(q => q.id === id); if (q && q.options && q.options.length > 1) { q.options.splice(i, 1); renderBuild(); }}
 
 function esc(s) { return String(s || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 function typeLabel(t) {
-  return {short:'Short answer',long:'Paragraph',radio:'Multiple choice',checkbox:'Checkboxes',dropdown:'Dropdown',email:'Email',number:'Number',date:'Date',section:'Section'}[t] || t;
+  return {short:'Short answer',long:'Paragraph',radio:'Multiple choice',checkbox:'Checkboxes',dropdown:'Dropdown',email:'Email',number:'Number',date:'Date',file:'File upload',section:'Section'}[t] || t;
 }
 
 function addSection() {
@@ -1590,6 +1597,18 @@ function renderBuild() {
     qNum++;
     const hasOpts = q.options !== undefined;
     const optIco = q.type === 'checkbox' ? 'sq' : '';
+
+    // "Other (specify)" toggle for radio and checkbox
+    const hasOtherToggle = ['radio','checkbox'].includes(q.type);
+    const otherToggleHtml = hasOtherToggle ? `
+      <div style="margin-top:6px;display:flex;align-items:center;gap:8px;">
+        <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text2);cursor:pointer;user-select:none;">
+          <input type="checkbox" ${q.allowOther?'checked':''} onchange="toggleAllowOther('${q.id}',this.checked)"
+            style="cursor:pointer;accent-color:var(--accent)"/>
+          Allow "Other (specify)"
+        </label>
+      </div>` : '';
+
     const optsHtml = hasOpts ? `
       <div class="options">
         ${q.options.map((o, oi) => `
@@ -1600,9 +1619,34 @@ function renderBuild() {
             ${q.options.length > 1 ? `<button class="opt-del" onclick="removeOption('${q.id}',${oi})">×</button>` : ''}
           </div>`).join('')}
         <button class="add-opt-btn" onclick="addOption('${q.id}')">+ Add option</button>
+        ${otherToggleHtml}
       </div>` : '';
 
-    const typeSel = ['short','long','radio','checkbox','dropdown','email','number','date']
+    // File upload config UI
+    const fileConfigHtml = q.type === 'file' ? `
+      <div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+        <div style="display:flex;flex-direction:column;gap:4px;">
+          <label style="font-size:11px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:0.3px;">Accepted files</label>
+          <select class="q-type-select" style="font-size:12px;" onchange="setFileTypes('${q.id}',this.value)">
+            <option value="any" ${(q.fileTypes||'any')==='any'?'selected':''}>Any file</option>
+            <option value="image" ${q.fileTypes==='image'?'selected':''}>Images only</option>
+            <option value="pdf" ${q.fileTypes==='pdf'?'selected':''}>PDF only</option>
+            <option value="doc" ${q.fileTypes==='doc'?'selected':''}>Documents (PDF, Word, Excel)</option>
+            <option value="image,pdf" ${q.fileTypes==='image,pdf'?'selected':''}>Images + PDF</option>
+          </select>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px;">
+          <label style="font-size:11px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:0.3px;">Max size (MB)</label>
+          <input type="number" min="1" max="50" value="${q.maxSizeMB||10}"
+            onchange="setMaxSize('${q.id}',this.value)"
+            style="width:70px;font-size:13px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);outline:none;"/>
+        </div>
+        <div style="font-size:12px;color:var(--text3);margin-top:16px;">
+          Respondents pick a file from their device. File name is saved as the answer.
+        </div>
+      </div>` : '';
+
+    const typeSel = ['short','long','radio','checkbox','dropdown','email','number','date','file']
       .map(t => `<option value="${t}"${q.type===t?' selected':''}>${typeLabel(t)}</option>`).join('');
 
     return `<div class="q-card" id="card-${q.id}">
@@ -1617,6 +1661,7 @@ function renderBuild() {
         onfocus="this.closest('.q-card').classList.add('focused')"
         onblur="this.closest('.q-card').classList.remove('focused')"/>
       ${optsHtml}
+      ${fileConfigHtml}
     </div>`;
   }).join('');
 }
@@ -1670,15 +1715,21 @@ function buildPrintQuestions() {
     } else if (q.type === 'long') {
       answerHtml = `<span class="print-answer-box"></span>`;
     } else if (q.type === 'radio') {
-      answerHtml = `<div class="print-options">${(q.options||[]).map(o =>
-        `<div class="print-option"><span class="print-option-circle"></span><span class="print-option-label">${esc(o)}</span></div>`
+      const radioOpts = [...(q.options||[])];
+      if (q.allowOther) radioOpts.push('Other (specify)');
+      answerHtml = `<div class="print-options">${radioOpts.map(o =>
+        `<div class="print-option"><span class="print-option-circle"></span><span class="print-option-label">${esc(o)}</span>${o==='Other (specify)'?'<span class="print-answer-line" style="flex:1;margin-top:0;height:14pt;margin-left:6pt;"></span>':''}</div>`
       ).join('')}</div>`;
     } else if (q.type === 'checkbox') {
-      answerHtml = `<div class="print-options">${(q.options||[]).map(o =>
-        `<div class="print-option"><span class="print-option-square"></span><span class="print-option-label">${esc(o)}</span></div>`
+      const cbOpts = [...(q.options||[])];
+      if (q.allowOther) cbOpts.push('Other (specify)');
+      answerHtml = `<div class="print-options">${cbOpts.map(o =>
+        `<div class="print-option"><span class="print-option-square"></span><span class="print-option-label">${esc(o)}</span>${o==='Other (specify)'?'<span class="print-answer-line" style="flex:1;margin-top:0;height:14pt;margin-left:6pt;"></span>':''}</div>`
       ).join('')}</div>`;
     } else if (q.type === 'dropdown') {
       answerHtml = `<div class="print-dropdown-opts">Options: ${(q.options||[]).map(o => esc(o)).join(' · ')}</div><span class="print-answer-line"></span>`;
+    } else if (q.type === 'file') {
+      answerHtml = `<div style="border:1.5pt dashed #aaa;border-radius:4pt;padding:10pt;text-align:center;margin-top:4pt;color:#888;font-size:10pt;">📎 Attach document / file here</div>`;
     }
     return `<div class="q-card" style="page-break-inside:avoid">
       <input class="q-label-input" value="${esc(label)}${reqMark}" readonly style="font-weight:600;white-space:normal;word-break:break-word;pointer-events:none"/>
@@ -2024,11 +2075,23 @@ function renderPreview() {
     } else if (q.type === 'date') {
       inp = `<input type="date"/>`;
     } else if (q.type === 'radio') {
-      inp = `<div class="pv-options">${(q.options||[]).map(o => `<label class="pv-option"><input type="radio" name="${q.id}"> ${esc(o)}</label>`).join('')}</div>`;
+      const rOpts = [...(q.options||[])];
+      if (q.allowOther) rOpts.push('__other__');
+      inp = `<div class="pv-options">${rOpts.map(o => o==='__other__'
+        ? `<label class="pv-option"><input type="radio" name="${q.id}"> Other (specify): <input type="text" placeholder="Please specify" style="margin-left:6px;flex:1;font-size:14px;border:none;border-bottom:1px solid var(--border2);outline:none;background:transparent;padding:2px 4px;"/></label>`
+        : `<label class="pv-option"><input type="radio" name="${q.id}"> ${esc(o)}</label>`
+      ).join('')}</div>`;
     } else if (q.type === 'checkbox') {
-      inp = `<div class="pv-options">${(q.options||[]).map(o => `<label class="pv-option"><input type="checkbox"> ${esc(o)}</label>`).join('')}</div>`;
+      const cbOpts = [...(q.options||[])];
+      if (q.allowOther) cbOpts.push('__other__');
+      inp = `<div class="pv-options">${cbOpts.map(o => o==='__other__'
+        ? `<label class="pv-option"><input type="checkbox"> Other (specify): <input type="text" placeholder="Please specify" style="margin-left:6px;flex:1;font-size:14px;border:none;border-bottom:1px solid var(--border2);outline:none;background:transparent;padding:2px 4px;"/></label>`
+        : `<label class="pv-option"><input type="checkbox"> ${esc(o)}</label>`
+      ).join('')}</div>`;
     } else if (q.type === 'dropdown') {
       inp = `<select><option value="">Choose an option</option>${(q.options||[]).map(o=>`<option>${esc(o)}</option>`).join('')}</select>`;
+    } else if (q.type === 'file') {
+      inp = `<div style="border:2px dashed var(--border2);border-radius:10px;padding:1.5rem;text-align:center;color:var(--text3);font-size:14px;cursor:pointer;">📎 Click to upload a file</div>`;
     }
     return `<div class="pv-field"><label>${esc(lbl)}${req}</label>${inp}</div>`;
   }).join('');

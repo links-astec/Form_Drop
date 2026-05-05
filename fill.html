@@ -129,6 +129,52 @@ button, select, input, textarea {
   padding-right: 36px;
 }
 
+/* ── FILE UPLOAD ─────────────────────────────────────────── */
+.file-upload-area {
+  border: 2px dashed var(--border2);
+  border-radius: 12px;
+  padding: 1.5rem 1rem;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+  position: relative;
+  background: var(--bg);
+}
+.file-upload-area:hover { border-color: var(--accent); background: var(--accent-light); }
+.file-upload-area.has-file { border-color: var(--accent); background: var(--accent-light); }
+.file-upload-area input[type=file] {
+  position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+}
+.file-upload-icon { font-size: 28px; margin-bottom: 6px; }
+.file-upload-label { font-size: 14px; font-weight: 500; color: var(--text2); display: block; margin-bottom: 3px; }
+.file-upload-hint { font-size: 12px; color: var(--text3); }
+.file-upload-chosen {
+  display: flex; align-items: center; gap: 8px;
+  margin-top: 8px; padding: 8px 12px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; font-size: 13px; color: var(--text);
+  display: none;
+}
+.file-upload-chosen.show { display: flex; }
+.file-upload-chosen-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-upload-clear { background: none; border: none; cursor: pointer; color: var(--text3); font-size: 18px; line-height: 1; padding: 0 2px; flex-shrink: 0; }
+.file-upload-clear:hover { color: var(--danger); }
+
+/* ── OTHER SPECIFY ───────────────────────────────────────── */
+.other-specify-wrap { display: none; margin-top: 8px; }
+.other-specify-wrap.show { display: block; }
+.other-specify-input {
+  width: 100%; font-size: 15px;
+  padding: 10px 13px;
+  border: 1.5px solid var(--accent);
+  border-radius: 10px;
+  background: var(--accent-light);
+  color: var(--text); outline: none;
+  transition: box-shadow 0.2s;
+}
+.other-specify-input:focus { box-shadow: 0 0 0 3px rgba(42,92,69,0.15); }
+.other-specify-input::placeholder { color: var(--text3); }
+
 /* ── SECTION DIVIDER ─────────────────────────────────────── */
 .q-section {
   padding: 1rem 0 0.25rem;
@@ -388,6 +434,13 @@ button, select, input, textarea {
   .q-section-title { font-size: 15px; }
 }
 
+@media (max-width: 768px) {
+  .file-upload-area { padding: 1.25rem 1rem; border-radius: 14px; }
+  .file-upload-icon { font-size: 32px; }
+  .file-upload-label { font-size: 15px; }
+  .other-specify-input { font-size: 16px; min-height: 48px; }
+}
+
 @media (max-width: 390px) {
   .form-title { font-size: 20px; }
   .q-label { font-size: 14px; }
@@ -522,17 +575,54 @@ function renderForm(data) {
     else if (q.type === 'date') inp = `<input type="date" id="ans-${q.id}"/>`;
     else if (q.type === 'long') inp = `<textarea id="ans-${q.id}" placeholder="Your answer"></textarea>`;
     else if (q.type === 'radio') {
-      inp = `<div class="q-options" id="ans-${q.id}">${(q.options||[]).map(o =>
-        `<label class="q-option" onclick="selectOpt(this,'${q.id}','radio')">
-          <input type="radio" name="${q.id}" value="${esc(o)}"> ${esc(o)}
-        </label>`).join('')}</div>`;
+      const radioOpts = [...(q.options||[])];
+      if (q.allowOther) radioOpts.push('__other__');
+      inp = `<div class="q-options" id="ans-${q.id}">
+        ${radioOpts.map(o => o === '__other__'
+          ? `<label class="q-option" onclick="selectOpt(this,'${q.id}','radio',true)">
+               <input type="radio" name="${q.id}" value="__other__"> Other (specify)
+             </label>`
+          : `<label class="q-option" onclick="selectOpt(this,'${q.id}','radio')">
+               <input type="radio" name="${q.id}" value="${esc(o)}"> ${esc(o)}
+             </label>`
+        ).join('')}
+        <div class="other-specify-wrap" id="other-${q.id}">
+          <input class="other-specify-input" id="other-text-${q.id}" placeholder="Please specify…" type="text"/>
+        </div>
+      </div>`;
     } else if (q.type === 'checkbox') {
-      inp = `<div class="q-options" id="ans-${q.id}">${(q.options||[]).map((o, oi) =>
-        `<label class="q-option" onclick="toggleOpt(this)">
-          <input type="checkbox" name="${q.id}-${oi}" value="${esc(o)}"> ${esc(o)}
-        </label>`).join('')}</div>`;
+      const cbOpts = [...(q.options||[])];
+      if (q.allowOther) cbOpts.push('__other__');
+      inp = `<div class="q-options" id="ans-${q.id}">
+        ${cbOpts.map((o, oi) => o === '__other__'
+          ? `<label class="q-option" onclick="toggleOpt(this, true, '${q.id}')">
+               <input type="checkbox" name="${q.id}-other" value="__other__"> Other (specify)
+             </label>`
+          : `<label class="q-option" onclick="toggleOpt(this)">
+               <input type="checkbox" name="${q.id}-${oi}" value="${esc(o)}"> ${esc(o)}
+             </label>`
+        ).join('')}
+        <div class="other-specify-wrap" id="other-${q.id}">
+          <input class="other-specify-input" id="other-text-${q.id}" placeholder="Please specify…" type="text"/>
+        </div>
+      </div>`;
     } else if (q.type === 'dropdown') {
       inp = `<select id="ans-${q.id}"><option value="">Choose an option</option>${(q.options||[]).map(o=>`<option value="${esc(o)}">${esc(o)}</option>`).join('')}</select>`;
+    } else if (q.type === 'file') {
+      const acceptMap = { image:'image/*', pdf:'application/pdf', doc:'.pdf,.doc,.docx,.xls,.xlsx', 'image,pdf':'image/*,application/pdf', any:'*' };
+      const accept = acceptMap[q.fileTypes||'any'] || '*';
+      const maxMB = q.maxSizeMB || 10;
+      inp = `<div class="file-upload-area" id="upload-area-${q.id}" onclick="document.getElementById('file-${q.id}').click()">
+        <input type="file" id="file-${q.id}" accept="${accept}"
+          onchange="handleFileChange('${q.id}', this, ${maxMB})" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;"/>
+        <div class="file-upload-icon">📎</div>
+        <span class="file-upload-label">Tap to upload a file</span>
+        <span class="file-upload-hint">Max ${maxMB}MB${q.fileTypes && q.fileTypes!=='any' ? ' · ' + q.fileTypes : ''}</span>
+      </div>
+      <div class="file-upload-chosen" id="chosen-${q.id}">
+        <span class="file-upload-chosen-name" id="chosen-name-${q.id}"></span>
+        <button class="file-upload-clear" onclick="clearFile('${q.id}')" type="button">×</button>
+      </div>`;
     }
 
     return `<div class="q-field" id="field-${q.id}" data-id="${q.id}" data-type="${q.type}" data-required="${q.required}">
@@ -564,16 +654,33 @@ function renderForm(data) {
     </div>`;
 }
 
-function selectOpt(lbl, qid) {
+function selectOpt(lbl, qid, type, isOther) {
   const w = document.getElementById('ans-' + qid);
   if (!w) return;
   w.querySelectorAll('.q-option').forEach(el => el.classList.remove('selected'));
   lbl.classList.add('selected');
+  // Show/hide "Other" text input
+  const otherWrap = document.getElementById('other-' + qid);
+  if (otherWrap) otherWrap.classList.toggle('show', !!isOther);
+  if (isOther) {
+    const ot = document.getElementById('other-text-' + qid);
+    if (ot) setTimeout(() => ot.focus(), 50);
+  }
 }
 
-function toggleOpt(lbl) {
+function toggleOpt(lbl, isOther, qid) {
   const cb = lbl.querySelector('input[type=checkbox]');
-  setTimeout(() => lbl.classList.toggle('selected', cb.checked), 0);
+  setTimeout(() => {
+    lbl.classList.toggle('selected', cb.checked);
+    if (isOther && qid) {
+      const otherWrap = document.getElementById('other-' + qid);
+      if (otherWrap) otherWrap.classList.toggle('show', cb.checked);
+      if (cb.checked) {
+        const ot = document.getElementById('other-text-' + qid);
+        if (ot) setTimeout(() => ot.focus(), 50);
+      }
+    }
+  }, 0);
 }
 
 function getValue(q) {
@@ -584,13 +691,55 @@ function getValue(q) {
     const el = document.getElementById('ans-' + q.id);
     if (!el) return '';
     const checked = el.querySelector('input[type=radio]:checked');
-    return checked ? checked.value : '';
+    if (!checked) return '';
+    if (checked.value === '__other__') {
+      const otherText = document.getElementById('other-text-' + q.id);
+      return otherText ? ('Other: ' + otherText.value.trim()) : 'Other';
+    }
+    return checked.value;
   } else if (q.type === 'checkbox') {
     const el = document.getElementById('ans-' + q.id);
     if (!el) return [];
-    return Array.from(el.querySelectorAll('input[type=checkbox]:checked')).map(c => c.value);
+    const vals = Array.from(el.querySelectorAll('input[type=checkbox]:checked')).map(c => {
+      if (c.value === '__other__') {
+        const otherText = document.getElementById('other-text-' + q.id);
+        return otherText ? ('Other: ' + otherText.value.trim()) : 'Other';
+      }
+      return c.value;
+    });
+    return vals;
+  } else if (q.type === 'file') {
+    const fileInput = document.getElementById('file-' + q.id);
+    if (!fileInput || !fileInput.files[0]) return '';
+    return fileInput.files[0].name; // save filename as the answer
   }
   return '';
+}
+
+// File upload handlers
+function handleFileChange(qid, input, maxMB) {
+  const file = input.files[0];
+  if (!file) return;
+  if (file.size > maxMB * 1024 * 1024) {
+    alert(`File is too large. Maximum size is ${maxMB}MB.`);
+    input.value = '';
+    return;
+  }
+  const area = document.getElementById('upload-area-' + qid);
+  const chosen = document.getElementById('chosen-' + qid);
+  const chosenName = document.getElementById('chosen-name-' + qid);
+  if (area) area.classList.add('has-file');
+  if (chosen) chosen.classList.add('show');
+  if (chosenName) chosenName.textContent = file.name + ' (' + (file.size / 1024 / 1024).toFixed(2) + ' MB)';
+}
+
+function clearFile(qid) {
+  const fileInput = document.getElementById('file-' + qid);
+  if (fileInput) fileInput.value = '';
+  const area = document.getElementById('upload-area-' + qid);
+  const chosen = document.getElementById('chosen-' + qid);
+  if (area) area.classList.remove('has-file');
+  if (chosen) chosen.classList.remove('show');
 }
 
 async function submitForm() {
