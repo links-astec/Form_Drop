@@ -2404,17 +2404,107 @@ function parseRespondentNameFromText(text) {
   return m ? m[1].trim() : '';
 }
 
+// Also accepts a plain numbered list ("6. Yes" / "6) Yes" / "6: Yes") with no
+// "Q:"/"A:" wording — the number is the question's position on the form, so
+// skipped questions (unanswered ones just missing from the list) still line up
+// correctly without needing any question text at all.
+function looksLikeNumberedAnswerList(text) {
+  const numbered = (text.match(/^\s*\d+[\.\):]\s*\S/gim) || []).length;
+  return numbered >= 3;
+}
+
+function parseNumberedAnswers(text) {
+  const items = [];
+  let current = null;
+  text.split('\n').forEach(raw => {
+    const line = raw.trim();
+    const m = line.match(/^(\d+)[\.\):]\s*(.*)$/);
+    if (m) {
+      if (current) items.push(current);
+      current = { n: parseInt(m[1], 10), text: m[2].trim() };
+    } else if (current && line) {
+      current.text += (current.text ? ' ' : '') + line;
+    }
+  });
+  if (current) items.push(current);
+  return items;
+}
+
+// Generic words that dominate short question labels ("What is your ...?") and
+// would otherwise make unrelated questions look similar — stripped before
+// comparing so text-similarity is driven by actual distinctive content.
+const QA_STOPWORDS = new Set(['what','is','your','the','of','are','do','you','this','that','a','an','in','on','to','for','and','or','does','did','will','would','should','could','has','have','had','be','being','been','if','yes','no','not','any','which','who','whom','how','when','where','why','along','about','with','from','near','at','can','their']);
+function qaContentWords(s) {
+  return new Set(String(s||'').toLowerCase().replace(/[^\w\s]/g, ' ').split(/\s+/).filter(w => w.length > 2 && !QA_STOPWORDS.has(w)));
+}
+function qaLabelSimilarity(a, b) {
+  const wa = qaContentWords(a), wb = qaContentWords(b);
+  if (!wa.size || !wb.size) return 0;
+  let overlap = 0;
+  wa.forEach(w => { if (wb.has(w)) overlap++; });
+  return overlap / Math.max(wa.size, wb.size);
+}
+
+// Resolves each {q,a} pair to a question id IN ORDER. Since the user's answers
+// are guaranteed to follow question order, a later pair can only match a
+// question at or after the position of the previous match — this narrows the
+// search enough that lenient text matching becomes safe (no risk of jumping
+// back to an unrelated earlier question with similar wording), and any pair
+// that doesn't clearly match anything nearby just falls back to "the next
+// question in order," which is correct as long as the guarantee holds even if
+// the question wording is off entirely.
+function resolveOrderedPairs(pairs, answerableQuestions) {
+  const norm = s => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  let cursor = 0;
+  const resolved = {};
+  pairs.forEach(p => {
+    let matchIdx = -1;
+    for (let i = cursor; i < answerableQuestions.length; i++) {
+      if (norm(answerableQuestions[i].label) === norm(p.q)) { matchIdx = i; break; }
+    }
+    if (matchIdx === -1) {
+      let best = -1, bestScore = 0, secondScore = 0;
+      for (let i = cursor; i < answerableQuestions.length; i++) {
+        const score = qaLabelSimilarity(p.q, answerableQuestions[i].label);
+        if (score > bestScore) { secondScore = bestScore; bestScore = score; best = i; }
+        else if (score > secondScore) { secondScore = score; }
+      }
+      if (best !== -1 && bestScore >= 0.4 && (bestScore - secondScore >= 0.15 || bestScore >= 0.7)) matchIdx = best;
+    }
+    if (matchIdx === -1) matchIdx = cursor; // trust the guaranteed order
+    if (matchIdx >= answerableQuestions.length) return;
+    resolved[answerableQuestions[matchIdx].id] = p.a;
+    cursor = matchIdx + 1;
+  });
+  return resolved;
+}
+
 // Handles a structured Q:/A: paste entirely client-side — no AI call needed.
-// Reuses submitParsedResponse()'s existing id/label/number resolver and option
-// value-snapping, same as the AI-driven path uses.
 async function handleDirectQARecord(userText) {
   const pairs = parseQAPairs(userText);
   if (!pairs.length) {
     addAIMessage('assistant', 'I saw "Q:"/"A:" markers but couldn\'t parse any complete pairs — make sure each question starts a new line with "Q:" and its answer starts the next line with "A:".');
     return;
   }
+  const answerableQuestions = qs.filter(q => q.type !== 'section');
+  const answers = resolveOrderedPairs(pairs, answerableQuestions);
+  await submitParsedResponse({ respondentName: parseRespondentNameFromText(userText), answers });
+}
+
+// Handles a plain numbered list ("6. Yes") entirely client-side — the number IS
+// the question's position, so this needs no text matching at all.
+async function handleDirectNumberedRecord(userText) {
+  const answerableQuestions = qs.filter(q => q.type !== 'section');
+  const items = parseNumberedAnswers(userText);
   const answers = {};
-  pairs.forEach(p => { answers[p.q] = p.a; });
+  items.forEach(it => {
+    const q = answerableQuestions[it.n - 1];
+    if (q && it.text) answers[q.id] = it.text;
+  });
+  if (!Object.keys(answers).length) {
+    addAIMessage('assistant', 'I found numbered lines but couldn\'t match any to a question — number each line by its position on the form, e.g. "6. Yes" for the 6th question.');
+    return;
+  }
   await submitParsedResponse({ respondentName: parseRespondentNameFromText(userText), answers });
 }
 
@@ -2431,9 +2521,15 @@ async function sendAI() {
   // Hide suggestions after first message
   document.getElementById('ai-suggestions').style.display = 'none';
 
-  // Structured Q:/A: pastes are handled directly — see handleDirectQARecord for why.
+  // Structured Q:/A: or plain numbered-list pastes are handled directly, with no
+  // AI call — see handleDirectQARecord/handleDirectNumberedRecord for why.
   if (looksLikeQARecord(userText)) {
     await handleDirectQARecord(userText);
+    document.getElementById('ai-send-btn').disabled = false;
+    return;
+  }
+  if (looksLikeNumberedAnswerList(userText)) {
+    await handleDirectNumberedRecord(userText);
     document.getElementById('ai-send-btn').disabled = false;
     return;
   }
