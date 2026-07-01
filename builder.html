@@ -1392,6 +1392,7 @@ header {
     <button class="ai-suggestion" onclick="aiSuggest(this)">Write a cover page for me</button>
     <button class="ai-suggestion" onclick="aiSuggest(this)">Make all questions required</button>
     <button class="ai-suggestion" onclick="aiSuggest(this)">Improve my question labels</button>
+    <button class="ai-suggestion" onclick="aiSuggest(this)">Create 3 respondents and have them fill this form</button>
     <button class="ai-suggestion" onclick="aiSuggest(this)">Fill this form using all my respondents</button>
   </div>
   <div class="ai-input-area">
@@ -1440,6 +1441,7 @@ function setActiveFormId(id) {
   localStorage.setItem('fd_form_uuid', id);
   const badge = document.getElementById('uuid-badge');
   if (badge) badge.textContent = 'Form ID: ' + id;
+  loadAIChatHistory();
 }
 
 window.addEventListener('DOMContentLoaded', () => {
@@ -2257,14 +2259,55 @@ function aiSuggest(btn) {
   sendAI();
 }
 
-function addAIMessage(role, text) {
+const AI_CHAT_GREETING_HTML = `Hi! I can help you build and improve your form. You can:
+      <br><br>• <strong>Paste any text</strong> and I'll generate questions from it
+      <br>• <strong>Ask me to make changes</strong> like "add a section about experience" or "make question 2 required"
+      <br>• <strong>Write a cover page</strong> — just describe what you need`;
+
+let aiChatHistory = []; // {role, text}[] for the active form — persisted to localStorage
+
+function addAIMessage(role, text, skipPersist) {
   const msgs = document.getElementById('ai-messages');
   const div = document.createElement('div');
   div.className = 'ai-msg ' + role;
-  div.innerHTML = text.replace(/\n/g, '<br>');
+  // esc() before inlining — text can come from the user's own typing or from the
+  // AI provider's response, neither of which should be trusted as raw HTML.
+  div.innerHTML = esc(text).replace(/\n/g, '<br>');
   msgs.appendChild(div);
   msgs.scrollTop = msgs.scrollHeight;
+  if (role !== 'thinking' && !skipPersist) {
+    aiChatHistory.push({ role, text });
+    saveAIChatHistory();
+  }
   return div;
+}
+
+function getAIChatKey() {
+  return 'fd_ai_chat_' + FORM_ID;
+}
+
+function saveAIChatHistory() {
+  try { localStorage.setItem(getAIChatKey(), JSON.stringify(aiChatHistory.slice(-60))); } catch(e) {}
+}
+
+// Restores the AI chat for whichever form is currently active — called whenever
+// the active form changes, so conversations survive page reloads and switching
+// between forms without bleeding into each other.
+function loadAIChatHistory() {
+  const msgs = document.getElementById('ai-messages');
+  const suggestions = document.getElementById('ai-suggestions');
+  if (!msgs || !suggestions) return;
+  let saved = [];
+  try { saved = JSON.parse(localStorage.getItem(getAIChatKey()) || '[]'); } catch(e) {}
+  aiChatHistory = saved.slice();
+  msgs.innerHTML = '';
+  if (saved.length) {
+    saved.forEach(m => addAIMessage(m.role, m.text, true));
+    suggestions.style.display = 'none';
+  } else {
+    msgs.innerHTML = `<div class="ai-msg assistant">${AI_CHAT_GREETING_HTML}</div>`;
+    suggestions.style.display = '';
+  }
 }
 
 function getFormContext() {
@@ -2391,7 +2434,10 @@ You can make changes to the form by returning a JSON "changes" object. You MUST 
     ],
     "deleteQuestionIds": ["optional array of question ids to remove"],
     "replaceAllQuestions": false,
-    "fillWithRespondents": "optional — 'all', or an array of respondent ids from the saved respondents list above"
+    "createRespondents": [
+      { "name": "respondent's name (required)", "persona": "short persona description — required if they should be usable for AI-generated answers", "email": "optional" }
+    ],
+    "fillWithRespondents": "optional — 'all', or an array of respondent names/ids (new or existing) from the saved respondents list above"
   }
 }
 
@@ -2403,10 +2449,11 @@ Rules:
 - To DELETE questions, list their ids in "deleteQuestionIds" — do not omit them from "questions" and expect them to disappear
 - Only set "replaceAllQuestions": true when the user explicitly wants to start over / regenerate the whole form from scratch (e.g. pasting new source text to build a fresh form) — in that case "questions" must contain the complete new list
 - If generating a form from pasted text on an empty or near-empty form, extract meaningful questions, use correct types, set required fields sensibly
+- If the user asks you to create/add a respondent (a saved person who can fill this form), use "createRespondents". Give them a "persona" (invent a short, sensible one from context if the user doesn't specify) whenever the user also wants them to auto-fill the form — a respondent with no persona can only be filled out manually by a real person, not by you.
 - If the user asks to generate/simulate responses, have respondents fill the form, or create test data, set "fillWithRespondents": each generated response is a real submission that will show up in Analytics, so only do this when asked
   - Use "all" to fill with every respondent that has an AI persona
-  - Use an array of specific respondent ids (from the list above) when the user names specific people
-  - If the user names someone who isn't in the saved respondents list, or asks to use a respondent without an AI persona, explain that in "message" instead and leave "fillWithRespondents" out
+  - Use an array of specific respondent names (or ids) when the user names specific people — this also matches respondents you just created in this same "changes" object
+  - If the user names someone who isn't in the saved respondents list and you weren't asked to create them, or asks to use a respondent without an AI persona, explain that in "message" instead and leave "fillWithRespondents" out
 - Always respond with valid JSON only — no markdown, no backticks, no extra text`;
 
   try {
@@ -2440,6 +2487,9 @@ Rules:
     addAIMessage('assistant', parsed.message || 'Done!');
     if (parsed.changes && Object.keys(parsed.changes).length > 0) {
       applyAIChanges(parsed.changes);
+      if (Array.isArray(parsed.changes.createRespondents) && parsed.changes.createRespondents.length) {
+        await createRespondentsFromAI(parsed.changes.createRespondents);
+      }
       if (parsed.changes.fillWithRespondents) {
         await runRespondentFill(parsed.changes.fillWithRespondents);
       }
@@ -2631,6 +2681,43 @@ Rules:
   }
 }
 
+// Called by the AI assistant when the user asks it to create one or more respondents.
+// Reuses the same /api/respondents endpoint as the manual "+ Add respondent" form.
+async function createRespondentsFromAI(list) {
+  const serverUrl = getServerUrl();
+  if (!serverUrl) {
+    addAIMessage('assistant', "I can't save new respondents right now — the server isn't connected. Check the Email alerts tab.");
+    return;
+  }
+
+  const names = [];
+  for (const r of list) {
+    const name = r && r.name ? String(r.name).trim() : '';
+    if (!name) continue;
+    try {
+      const resp = await fetch(serverUrl + '/respondents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          email: r.email ? String(r.email).trim() : '',
+          persona: r.persona ? String(r.persona).trim() : '',
+        }),
+        signal: AbortSignal.timeout(10000),
+      });
+      const j = await resp.json();
+      if (j.ok) names.push(name);
+    } catch(e) { /* skip this one, keep going */ }
+  }
+
+  if (names.length) {
+    await loadRespondents(); // refresh in-memory list so fillWithRespondents can find them
+    addAIMessage('assistant', `Added respondent${names.length===1?'':'s'}: ${names.join(', ')}.`);
+  } else {
+    addAIMessage('assistant', "I couldn't save the new respondent(s) — check the Respondents tab and try again.");
+  }
+}
+
 // Called by the AI assistant when the user asks it to generate responses via respondents.
 // spec is meant to be "all" or an array of respondent ids, but the model doesn't
 // always follow that shape exactly — it may return a bare string instead of an
@@ -2709,6 +2796,7 @@ function toast(msg) {
 
 /* INIT */
 renderBuild();
+loadAIChatHistory();
 </script>
 </body>
 </html>
