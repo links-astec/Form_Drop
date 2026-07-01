@@ -29,12 +29,14 @@ async function ensureTables(pool) {
       updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
     CREATE TABLE IF NOT EXISTS submissions (
-      id           BIGSERIAL PRIMARY KEY,
-      form_id      TEXT NOT NULL REFERENCES forms(id) ON DELETE CASCADE,
-      answers      JSONB NOT NULL DEFAULT '{}',
-      submitted_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      id             BIGSERIAL PRIMARY KEY,
+      form_id        TEXT NOT NULL REFERENCES forms(id) ON DELETE CASCADE,
+      answers        JSONB NOT NULL DEFAULT '{}',
+      submitted_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      respondent_name TEXT
     );
     CREATE INDEX IF NOT EXISTS submissions_form_id_idx ON submissions(form_id);
+    ALTER TABLE submissions ADD COLUMN IF NOT EXISTS respondent_name TEXT;
   `);
 }
 
@@ -86,7 +88,7 @@ module.exports = async function handler(req, res) {
     });
   }
 
-  const { formId, formTitle, questions, answers } = req.body;
+  const { formId, formTitle, questions, answers, respondentName } = req.body;
   if (!formId || !formTitle || !Array.isArray(questions) || !answers) {
     return res.status(400).json({ ok: false, error: "formId, formTitle, questions, and answers are all required" });
   }
@@ -99,8 +101,8 @@ module.exports = async function handler(req, res) {
     await ensureTables(pool);
 
     await pool.query(
-      `INSERT INTO submissions (form_id, answers) VALUES ($1, $2)`,
-      [formId, JSON.stringify(answers)]
+      `INSERT INTO submissions (form_id, answers, respondent_name) VALUES ($1, $2, $3)`,
+      [formId, JSON.stringify(answers), respondentName || null]
     );
 
     const { rows: allSubs } = await pool.query(

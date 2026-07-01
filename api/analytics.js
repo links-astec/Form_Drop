@@ -45,7 +45,7 @@ module.exports = async function handler(req, res) {
 
     // All submissions
     const { rows: subs } = await pool.query(
-      `SELECT id, answers, submitted_at FROM submissions WHERE form_id = $1 ORDER BY submitted_at ASC`,
+      `SELECT id, answers, submitted_at, respondent_name FROM submissions WHERE form_id = $1 ORDER BY submitted_at ASC`,
       [formId]
     );
 
@@ -62,6 +62,7 @@ module.exports = async function handler(req, res) {
         id: s.id,
         answers: s.answers,
         submittedAt: s.submitted_at,
+        respondentName: s.respondent_name || null,
       })),
       total: subs.length,
     });

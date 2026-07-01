@@ -198,6 +198,7 @@ header{
   <div class="logo"><div class="logo-dot"></div>FormDrop Analytics</div>
   <div class="header-right">
     <button class="btn" onclick="window.location.href='builder.html'">← Builder</button>
+    <button class="btn" id="export-pdf-btn" onclick="exportPDF()" style="display:none">Export PDF</button>
     <button class="btn btn-primary" id="export-btn" onclick="exportXLSX()" style="display:none">Export XLSX</button>
   </div>
 </header>
@@ -228,6 +229,7 @@ header{
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script>
 const COLORS=['#2a5c45','#4a9e7d','#f59e0b','#3b82f6','#ec4899','#8b5cf6','#ef4444','#14b8a6','#f97316','#6366f1'];
 
@@ -346,7 +348,10 @@ async function loadAnalytics(formId) {
     status.className = 'config-status ok';
     status.textContent = `✓ ${data.total} response${data.total===1?'':'s'} for "${data.form.title}"`;
     renderAnalytics(data);
-    if (data.total > 0) document.getElementById('export-btn').style.display = '';
+    if (data.total > 0) {
+      document.getElementById('export-btn').style.display = '';
+      document.getElementById('export-pdf-btn').style.display = '';
+    }
   } catch(e) {
     status.className = 'config-status err';
     status.textContent = '✗ ' + e.message;
@@ -499,16 +504,18 @@ function renderCharts(form, submissions, answered) {
 /* ── All responses table ───────────────────────────────────────────────────── */
 function renderTable(form, submissions) {
   const table = document.getElementById('resp-table');
-  const headers = ['#', 'Submitted', ...form.questions.map((q,i) => q.label||`Q${i+1}`)];
+  const hasRespondents = submissions.some(s => s.respondentName);
+  const headers = ['#', 'Submitted', ...(hasRespondents ? ['Respondent'] : []), ...form.questions.map((q,i) => q.label||`Q${i+1}`)];
   const thead = headers.map(h => `<th>${esc(h)}</th>`).join('');
   const rows = submissions.map((s, i) => {
     const date = new Date(s.submittedAt).toLocaleString();
+    const respCell = hasRespondents ? `<td>${s.respondentName ? esc(s.respondentName) : `<span style="color:var(--text3)">—</span>`}</td>` : '';
     const cells = form.questions.map(q => {
       const v = s.answers?.[q.id];
       const str = Array.isArray(v) ? v.join(', ') : (v||'');
       return `<td title="${esc(str)}">${esc(str)||`<span style="color:var(--text3)">—</span>`}</td>`;
     }).join('');
-    return `<tr><td><span class="badge">${i+1}</span></td><td style="white-space:nowrap;color:var(--text2)">${date}</td>${cells}</tr>`;
+    return `<tr><td><span class="badge">${i+1}</span></td><td style="white-space:nowrap;color:var(--text2)">${date}</td>${respCell}${cells}</tr>`;
   }).join('');
   table.innerHTML = `<thead><tr>${thead}</tr></thead><tbody>${rows}</tbody>`;
 }
@@ -530,6 +537,126 @@ function exportXLSX() {
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Responses');
   XLSX.writeFile(wb, (form.title||'responses').replace(/[^a-z0-9]/gi,'_')+'_responses.xlsx');
+}
+
+/* ── PDF export — full analytics report (summary, charts, per-question breakdown) ── */
+function exportPDF() {
+  if (!currentData || !window.jspdf) return;
+  const { form, submissions, total } = currentData;
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const margin = 44;
+  let y = margin;
+
+  function ensureSpace(h) {
+    if (y + h > pageH - margin) { doc.addPage(); y = margin; }
+  }
+  function wrapText(text, maxWidth, size) {
+    doc.setFontSize(size);
+    return doc.splitTextToSize(String(text || ''), maxWidth);
+  }
+
+  // Header
+  doc.setFont(undefined, 'bold'); doc.setFontSize(18); doc.setTextColor(26,25,22);
+  doc.text(form.title || 'Untitled form', margin, y);
+  y += 20;
+  doc.setFont(undefined, 'normal'); doc.setFontSize(10); doc.setTextColor(107,103,96);
+  doc.text(`Analytics report · ${total} response${total===1?'':'s'} · generated ${new Date().toLocaleString()}`, margin, y);
+  y += 10;
+  doc.setDrawColor(226,221,212); doc.line(margin, y, pageW - margin, y);
+  y += 24;
+  doc.setTextColor(26,25,22);
+
+  const answered = q => submissions.filter(s => {
+    const v = s.answers?.[q.id];
+    return Array.isArray(v) ? v.length > 0 : !!v;
+  }).length;
+
+  const typeLabel = {short:'Short answer',long:'Paragraph',radio:'Multiple choice',checkbox:'Checkboxes',dropdown:'Dropdown',email:'Email',number:'Number',date:'Date',file:'File upload'};
+
+  form.questions.forEach((q, qi) => {
+    if (q.type === 'section') return;
+    ensureSpace(70);
+
+    doc.setFont(undefined, 'bold'); doc.setFontSize(12.5);
+    const titleLines = wrapText(q.label || `Question ${qi+1}`, pageW - 2*margin, 12.5);
+    doc.text(titleLines, margin, y);
+    y += titleLines.length * 15;
+
+    doc.setFont(undefined, 'normal'); doc.setFontSize(9.5); doc.setTextColor(168,164,158);
+    doc.text(`${typeLabel[q.type] || q.type} · ${answered(q)}/${submissions.length} answered`, margin, y);
+    doc.setTextColor(26,25,22);
+    y += 14;
+
+    if (['radio','checkbox','dropdown'].includes(q.type)) {
+      const tally = {};
+      submissions.forEach(s => {
+        const v = s.answers?.[q.id];
+        const vals = Array.isArray(v) ? v : (v ? [v] : []);
+        vals.forEach(val => { if (val) tally[val] = (tally[val]||0)+1; });
+      });
+      const labels = Object.keys(tally);
+      const totalVals = Object.values(tally).reduce((a,b)=>a+b,0) || 1;
+      if (!labels.length) {
+        doc.setFontSize(10); doc.setTextColor(168,164,158);
+        doc.text('No answers yet.', margin, y);
+        doc.setTextColor(26,25,22);
+        y += 16;
+      } else {
+        // Reuse the on-screen doughnut chart canvas as an image if present
+        const canvas = document.getElementById('cv-' + q.id);
+        ensureSpace(labels.length * 14 + 20);
+        let barY = y;
+        if (canvas) {
+          try {
+            const img = canvas.toDataURL('image/png');
+            doc.addImage(img, 'PNG', margin, barY, 90, 90);
+          } catch(e) {}
+        }
+        const legX = canvas ? margin + 105 : margin;
+        const legW = pageW - margin - legX;
+        doc.setFontSize(10);
+        labels.forEach((lbl, i) => {
+          const pct = Math.round(tally[lbl]/totalVals*100);
+          const lines = wrapText(`${lbl} — ${tally[lbl]} (${pct}%)`, legW, 10);
+          doc.text(lines, legX, barY + 11);
+          barY += lines.length * 12;
+        });
+        y = Math.max(y + 100, barY + 8);
+      }
+    } else {
+      const answers = submissions.map(s => {
+        const v = s.answers?.[q.id];
+        return Array.isArray(v) ? v.join(', ') : (v||'');
+      }).filter(Boolean);
+      if (!answers.length) {
+        doc.setFontSize(10); doc.setTextColor(168,164,158);
+        doc.text('No answers yet.', margin, y);
+        doc.setTextColor(26,25,22);
+        y += 16;
+      } else {
+        const shown = answers.slice(0, 15);
+        doc.setFontSize(10);
+        shown.forEach(a => {
+          const lines = wrapText('• ' + a, pageW - 2*margin, 10);
+          ensureSpace(lines.length * 13);
+          doc.text(lines, margin, y);
+          y += lines.length * 13;
+        });
+        if (answers.length > shown.length) {
+          doc.setTextColor(168,164,158);
+          doc.text(`…and ${answers.length - shown.length} more response${answers.length - shown.length===1?'':'s'} (see XLSX export for the full list).`, margin, y);
+          doc.setTextColor(26,25,22);
+          y += 14;
+        }
+      }
+    }
+    y += 16;
+  });
+
+  doc.save((form.title||'analytics').replace(/[^a-z0-9]/gi,'_') + '_analytics.pdf');
 }
 </script>
 </body>

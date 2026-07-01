@@ -12,6 +12,7 @@
     "api/analytics.js":  { "memory": 128, "maxDuration": 10 },
     "api/config.js":     { "memory": 128, "maxDuration": 5  },
     "api/health.js":     { "memory": 128, "maxDuration": 5  },
-    "api/ai.js":          { "memory": 128, "maxDuration": 15 }
+    "api/ai.js":          { "memory": 128, "maxDuration": 15 },
+    "api/respondents.js": { "memory": 128, "maxDuration": 10 }
   }
 }

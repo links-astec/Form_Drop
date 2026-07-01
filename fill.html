@@ -469,6 +469,8 @@ function esc(s) {
 const params = new URLSearchParams(window.location.search);
 const formId = params.get('id');
 const encodedF = params.get('f'); // legacy fallback
+const prefillName = params.get('respondent') || '';
+const prefillEmail = params.get('remail') || '';
 
 const wrap = document.getElementById('main-wrap');
 
@@ -652,6 +654,23 @@ function renderForm(data) {
       <div class="success-sub">Your response has been recorded.<br>Thank you for filling out this form.</div>
       <button class="another-btn" onclick="resetForm()">Submit another response</button>
     </div>`;
+
+  prefillRespondentFields(data);
+}
+
+// If a respondent link was used (?respondent=Name&remail=email@x.com), pre-fill
+// any question that looks like a name/email field so the person doesn't retype it.
+function prefillRespondentFields(data) {
+  if (!prefillName && !prefillEmail) return;
+  data.questions.forEach(q => {
+    if (q.type === 'email' && prefillEmail) {
+      const el = document.getElementById('ans-' + q.id);
+      if (el) el.value = prefillEmail;
+    } else if (q.type === 'short' && prefillName && /name/i.test(q.label || '')) {
+      const el = document.getElementById('ans-' + q.id);
+      if (el) el.value = prefillName;
+    }
+  });
 }
 
 function selectOpt(lbl, qid, type, isOther) {
@@ -791,6 +810,7 @@ async function submitForm() {
           formTitle: data.title,
           questions: data.questions,
           answers,
+          respondentName: prefillName || undefined,
         }),
         signal: AbortSignal.timeout(15000),
       });

@@ -422,6 +422,17 @@ header {
 .step { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; color: var(--text2); line-height: 1.5; }
 .step-num { min-width: 22px; height: 22px; background: var(--surface2); border: 1px solid var(--border); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; color: var(--text); flex-shrink: 0; margin-top: 1px; }
 
+/* ── RESPONDENTS ─────────────────────────────────────────── */
+.resp-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 1.1rem 1.25rem; margin-bottom: 10px; display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+.resp-card-name { font-size: 14.5px; font-weight: 600; }
+.resp-card-email { font-size: 12.5px; color: var(--text3); margin-top: 1px; }
+.resp-card-persona { font-size: 12.5px; color: var(--text2); margin-top: 6px; line-height: 1.5; max-width: 480px; }
+.resp-badge { display: inline-flex; align-items: center; font-size: 10.5px; font-weight: 600; padding: 2px 8px; border-radius: 30px; margin-top: 6px; letter-spacing: .3px; text-transform: uppercase; }
+.resp-badge.ai { background: var(--accent-light); color: var(--accent-text); }
+.resp-badge.manual { background: var(--surface2); color: var(--text2); }
+.resp-card-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.resp-status { font-size: 12px; color: var(--text3); }
+
 /* ── SECTION CARDS ───────────────────────────────────────── */
 .q-card.section-card {
   background: linear-gradient(135deg, var(--accent-light) 0%, var(--surface) 100%);
@@ -758,7 +769,7 @@ header {
   /* Hide everything that isn't the form content */
   header, .tabs, .mobile-nav, .header-actions, .add-q-bar,
   .share-grid, .email-config-card, .steps-list,
-  .toast, #sec-email, #sec-share, #sec-forms, #sec-preview,
+  .toast, #sec-email, #sec-share, #sec-forms, #sec-preview, #sec-respondents,
   .q-top, .q-delete, .q-type-select, .q-required-toggle,
   .preview-bar, .pv-submit,
   /* AI panel and backdrop — always hide on print */
@@ -853,9 +864,11 @@ header {
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     background: rgba(255,255,255,0.92);
+    overflow-x: auto;
   }
   .mobile-nav-item {
-    flex: 1;
+    flex: 1 0 auto;
+    min-width: 58px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -1128,6 +1141,10 @@ header {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
     Share
   </button>
+  <button class="mobile-nav-item" id="nav-respondents" onclick="switchTab('respondents')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    Respondents
+  </button>
   <button class="mobile-nav-item" id="nav-preview" onclick="switchTab('preview')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
     Preview
@@ -1152,6 +1169,7 @@ header {
     <button class="tab-btn active" onclick="switchTab('build')">Build</button>
     <button class="tab-btn" onclick="switchTab('email')">Email alerts</button>
     <button class="tab-btn" onclick="switchTab('share')">Share & QR</button>
+    <button class="tab-btn" onclick="switchTab('respondents')">Respondents</button>
     <button class="tab-btn" onclick="switchTab('preview')">Preview</button>
   </div>
 
@@ -1292,6 +1310,38 @@ header {
           <button class="btn" onclick="downloadQR()" style="width:100%;max-width:220px;">⬇ Download PNG</button>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- RESPONDENTS -->
+  <div id="sec-respondents" class="section">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;flex-wrap:wrap;gap:10px;">
+      <div>
+        <div style="font-size:20px;font-weight:600;letter-spacing:-0.3px;">Respondents</div>
+        <div style="font-size:13px;color:var(--text2);margin-top:2px;">Save people who fill your forms. Give them an AI persona and generate realistic test responses for this form in one click.</div>
+      </div>
+    </div>
+
+    <div class="email-config-card">
+      <div class="email-config-title">+ Add respondent</div>
+      <div class="cover-field" style="margin-bottom:10px;">
+        <label>Name</label>
+        <input class="cover-input" id="resp-name" type="text" placeholder="e.g. Alex Rivera"/>
+      </div>
+      <div class="cover-field" style="margin-bottom:10px;">
+        <label>Email (optional)</label>
+        <input class="cover-input" id="resp-email" type="email" placeholder="e.g. alex@example.com"/>
+      </div>
+      <div class="cover-field" style="margin-bottom:10px;">
+        <label>AI persona (optional — leave blank for a manual/real respondent)</label>
+        <textarea class="cover-input cover-textarea" id="resp-persona" placeholder="e.g. Busy parent of two, price-sensitive, skeptical of new brands, answers briefly"></textarea>
+      </div>
+      <button class="btn btn-primary" onclick="addRespondent()">Save respondent</button>
+      <span id="resp-add-status" style="margin-left:10px;font-size:12.5px;color:var(--text2);"></span>
+    </div>
+
+    <div id="respondents-list-body">
+      <div style="text-align:center;padding:2rem 1rem;color:var(--text3);font-size:14px;">Loading…</div>
     </div>
   </div>
 
@@ -2172,18 +2222,25 @@ function applyAIChanges(changes) {
     if (c.desc !== undefined) document.getElementById('cover-desc').value = c.desc;
     updateCoverPreview();
   }
-  if (changes.questions) {
-    // Merge strategy: new questions get new IDs; existing ones matched by id get updated
-    const newQs = changes.questions.map(q => {
-      if (q.id && qs.find(e => e.id === q.id)) {
-        // Update existing
-        const existing = qs.find(e => e.id === q.id);
-        return { ...existing, ...q };
+  if (changes.replaceAllQuestions) {
+    // Explicit full regeneration — only wipes existing questions when the AI asks for it
+    qs = (changes.questions || []).map(q => ({ ...q, id: q.id || uid() }));
+  } else if (changes.questions) {
+    // Default: non-destructive merge — update matched IDs in place, append anything new,
+    // and leave every question the AI didn't mention untouched.
+    changes.questions.forEach(q => {
+      const existingIdx = q.id ? qs.findIndex(e => e.id === q.id) : -1;
+      if (existingIdx !== -1) {
+        qs[existingIdx] = { ...qs[existingIdx], ...q };
+      } else {
+        qs.push({ ...q, id: q.id || uid() });
       }
-      // New question — generate proper ID
-      return { ...q, id: q.id || uid() };
     });
-    qs = newQs;
+  }
+  if (Array.isArray(changes.deleteQuestionIds) && changes.deleteQuestionIds.length) {
+    qs = qs.filter(q => !changes.deleteQuestionIds.includes(q.id));
+  }
+  if (changes.questions || changes.replaceAllQuestions || changes.deleteQuestionIds) {
     qIdx = qs.reduce((max, q) => {
       const n = parseInt((q.id||'').replace('q',''), 10);
       return isNaN(n) ? max : Math.max(max, n);
@@ -2235,16 +2292,20 @@ You can make changes to the form by returning a JSON "changes" object. You MUST 
         "required": true,
         "options": ["option1", "option2"]
       }
-    ]
+    ],
+    "deleteQuestionIds": ["optional array of question ids to remove"],
+    "replaceAllQuestions": false
   }
 }
 
 Rules:
 - "changes" can omit any key you're not changing — only include what actually changes
-- To ADD new questions, include them in the questions array with new IDs
-- To UPDATE existing questions, use their existing ID
-- To REPLACE all questions (e.g. generating from scratch), send the full array
-- If generating a form from pasted text, extract meaningful questions, use correct types, set required fields sensibly
+- "questions" is a PARTIAL list: only include questions you are adding or updating. Any existing question you don't mention is left exactly as-is — you never need to repeat the full form back.
+- To ADD a new question, include it in the questions array with a new id (e.g. "q_new_1")
+- To UPDATE an existing question, use its existing id and only the fields that changed
+- To DELETE questions, list their ids in "deleteQuestionIds" — do not omit them from "questions" and expect them to disappear
+- Only set "replaceAllQuestions": true when the user explicitly wants to start over / regenerate the whole form from scratch (e.g. pasting new source text to build a fresh form) — in that case "questions" must contain the complete new list
+- If generating a form from pasted text on an empty or near-empty form, extract meaningful questions, use correct types, set required fields sensibly
 - Always respond with valid JSON only — no markdown, no backticks, no extra text`;
 
   try {
@@ -2288,10 +2349,189 @@ Rules:
 }
 
 /* ============================================================
+   RESPONDENTS
+   ============================================================ */
+let respondents = [];
+
+async function loadRespondents() {
+  const body = document.getElementById('respondents-list-body');
+  const serverUrl = getServerUrl();
+  if (!serverUrl) {
+    body.innerHTML = `<div style="text-align:center;padding:2rem 1rem;color:var(--text3);font-size:14px;">Server not connected. Check the Email alerts tab.</div>`;
+    return;
+  }
+  try {
+    const r = await fetch(serverUrl + '/respondents', { signal: AbortSignal.timeout(10000) });
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.error || 'Could not load respondents');
+    respondents = j.respondents || [];
+    renderRespondentsList();
+  } catch(e) {
+    body.innerHTML = `<div style="text-align:center;padding:2rem 1rem;color:var(--danger);font-size:14px;">✗ ${esc(e.message)}</div>`;
+  }
+}
+
+function renderRespondentsList() {
+  const body = document.getElementById('respondents-list-body');
+  if (!respondents.length) {
+    body.innerHTML = `<div style="text-align:center;padding:2rem 1rem;color:var(--text3);font-size:14px;">No respondents yet. Add one above.</div>`;
+    return;
+  }
+  body.innerHTML = respondents.map(r => {
+    const hasPersona = !!(r.persona && r.persona.trim());
+    return `<div class="resp-card" id="resp-card-${esc(r.id)}">
+      <div>
+        <div class="resp-card-name">${esc(r.name)}</div>
+        ${r.email ? `<div class="resp-card-email">${esc(r.email)}</div>` : ''}
+        ${hasPersona ? `<div class="resp-card-persona">${esc(r.persona)}</div>` : ''}
+        <div class="resp-badge ${hasPersona ? 'ai' : 'manual'}">${hasPersona ? '✦ AI persona' : 'Manual respondent'}</div>
+      </div>
+      <div class="resp-card-actions">
+        <span class="resp-status" id="resp-status-${esc(r.id)}"></span>
+        ${hasPersona
+          ? `<button class="btn btn-primary" onclick="generateAIResponse('${esc(r.id)}')">✦ Fill this form as ${esc(r.name)}</button>`
+          : `<button class="btn" onclick="copyRespondentLink('${esc(r.id)}')">Copy fill link</button>`
+        }
+        <button class="btn" onclick="deleteRespondentUI('${esc(r.id)}')" style="color:var(--danger)">Delete</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function addRespondent() {
+  const nameEl = document.getElementById('resp-name');
+  const emailEl = document.getElementById('resp-email');
+  const personaEl = document.getElementById('resp-persona');
+  const status = document.getElementById('resp-add-status');
+  const name = nameEl.value.trim();
+  if (!name) { status.textContent = 'Name is required.'; status.style.color = 'var(--danger)'; return; }
+
+  const serverUrl = getServerUrl();
+  if (!serverUrl) { status.textContent = 'Server not connected.'; status.style.color = 'var(--danger)'; return; }
+
+  status.textContent = 'Saving…';
+  status.style.color = 'var(--text2)';
+  try {
+    const r = await fetch(serverUrl + '/respondents', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, email: emailEl.value.trim(), persona: personaEl.value.trim() }),
+      signal: AbortSignal.timeout(10000),
+    });
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.error || 'Could not save respondent');
+    nameEl.value = ''; emailEl.value = ''; personaEl.value = '';
+    status.textContent = '✓ Saved';
+    status.style.color = 'var(--accent)';
+    await loadRespondents();
+  } catch(e) {
+    status.textContent = '✗ ' + e.message;
+    status.style.color = 'var(--danger)';
+  }
+}
+
+async function deleteRespondentUI(id) {
+  if (!confirm('Delete this respondent?')) return;
+  const serverUrl = getServerUrl();
+  if (!serverUrl) return;
+  try {
+    const r = await fetch(serverUrl + '/respondents?id=' + encodeURIComponent(id), {
+      method: 'DELETE', signal: AbortSignal.timeout(10000),
+    });
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.error || 'Could not delete');
+    await loadRespondents();
+    toast('Respondent deleted');
+  } catch(e) {
+    toast('✗ ' + e.message);
+  }
+}
+
+function copyRespondentLink(id) {
+  const r = respondents.find(x => x.id === id);
+  if (!r) return;
+  let url = getShareURL();
+  url += '&respondent=' + encodeURIComponent(r.name);
+  if (r.email) url += '&remail=' + encodeURIComponent(r.email);
+  navigator.clipboard.writeText(url)
+    .then(() => toast('Fill link copied — pre-fills name/email for ' + r.name))
+    .catch(() => toast('Could not copy link'));
+}
+
+async function generateAIResponse(id) {
+  const r = respondents.find(x => x.id === id);
+  if (!r) return;
+  const statusEl = document.getElementById('resp-status-' + id);
+  const serverUrl = getServerUrl();
+  if (!serverUrl) { if (statusEl) statusEl.textContent = 'Server not connected'; return; }
+  if (!FORM_ID) { if (statusEl) statusEl.textContent = 'Save the form first'; return; }
+
+  if (statusEl) { statusEl.textContent = 'Generating answers…'; statusEl.style.color = 'var(--text2)'; }
+
+  const formContext = getFormContext();
+  const answerableQuestions = formContext.questions.filter(q => q.type !== 'section');
+  const systemPrompt = `You are simulating a survey respondent filling out a form. Respond only as this persona would — stay in character, keep answers realistic and concise.
+
+Persona: ${r.name}${r.email ? ' (' + r.email + ')' : ''}
+Persona description: ${r.persona}
+
+The form is:
+${JSON.stringify({ title: formContext.title, desc: formContext.desc, questions: answerableQuestions }, null, 2)}
+
+Respond with valid JSON only, in exactly this format:
+{ "answers": { "<questionId>": "<answer>" } }
+
+Rules:
+- Include one key per question id from the form above (skip section dividers, there are none in the list given to you)
+- For "radio" or "dropdown" questions, the value must be exactly one of that question's "options"
+- For "checkbox" questions, the value must be an array of one or more strings from that question's "options"
+- For "number" questions, the value must be a plain number as a string
+- For "date" questions, use YYYY-MM-DD format
+- Always respond with valid JSON only — no markdown, no backticks, no extra text`;
+
+  try {
+    const response = await fetch('/api/ai', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ systemPrompt, userMessage: 'Fill out the form as this persona.' }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error?.message || 'API error');
+
+    const raw = data.content?.[0]?.text || '';
+    const clean = raw.replace(/^```[a-z]*\n?/,'').replace(/\n?```$/,'').trim();
+    const parsed = JSON.parse(clean);
+    const answers = parsed.answers || {};
+
+    if (statusEl) { statusEl.textContent = 'Submitting…'; }
+
+    const submitRes = await fetch(serverUrl + '/submit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        formId: FORM_ID,
+        formTitle: document.getElementById('form-title').value || 'My Form',
+        questions: qs,
+        answers,
+        respondentName: r.name,
+      }),
+      signal: AbortSignal.timeout(15000),
+    });
+    const submitData = await submitRes.json();
+    if (!submitData.ok) throw new Error(submitData.error || 'Submission failed');
+
+    if (statusEl) { statusEl.textContent = '✓ Response submitted'; statusEl.style.color = 'var(--accent)'; }
+    toast(r.name + '\'s response was submitted — check Analytics');
+  } catch(e) {
+    if (statusEl) { statusEl.textContent = '✗ ' + e.message; statusEl.style.color = 'var(--danger)'; }
+  }
+}
+
+/* ============================================================
    TABS
    ============================================================ */
 function switchTab(name) {
-  const tabNames = ['forms','build','email','share','preview'];
+  const tabNames = ['forms','build','email','share','respondents','preview'];
   // Desktop tabs
   document.querySelectorAll('.tab-btn').forEach((b, i) => b.classList.toggle('active', tabNames[i] === name));
   // Mobile bottom nav
@@ -2304,6 +2544,7 @@ function switchTab(name) {
   window.scrollTo({ top: 0, behavior: 'smooth' });
   if (name === 'forms') loadFormsList();
   if (name === 'share') refreshShare();
+  if (name === 'respondents') loadRespondents();
   if (name === 'preview') renderPreview();
 }
 
