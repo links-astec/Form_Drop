@@ -568,7 +568,8 @@ function renderForm(data) {
 
     qCount++;
     const req = q.required ? `<span class="req">*</span>` : '';
-    const lbl = q.label || `Question ${qCount}`;
+    const baseLbl = q.label || `Question ${qCount}`;
+    const lbl = (data.numbered && q.label) ? `${qCount}. ${baseLbl}` : baseLbl;
     let inp = '';
 
     if (q.type === 'short') inp = `<input type="text" id="ans-${q.id}" placeholder="Your answer"/>`;

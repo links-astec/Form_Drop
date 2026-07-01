@@ -1192,6 +1192,10 @@ header {
     <div class="form-title-wrap">
       <input class="form-title-input" id="form-title" type="text" placeholder="Untitled form" value="My Form"/>
       <textarea class="form-desc-input" id="form-desc" placeholder="Add a description (optional)" rows="1"></textarea>
+      <label style="display:flex;align-items:center;gap:8px;margin-top:12px;font-size:13px;color:var(--text2);cursor:pointer;user-select:none;">
+        <input type="checkbox" id="numbered-toggle" onchange="onNumberedToggle(this.checked)" style="width:16px;height:16px;accent-color:var(--accent);cursor:pointer;"/>
+        Number the questions (1, 2, 3…) when respondents fill this form
+      </label>
     </div>
 
     <!-- COVER PAGE EDITOR -->
@@ -1402,6 +1406,12 @@ header {
    ============================================================ */
 let qs = [];
 let qIdx = 0;
+let numberedQuestions = false;
+
+function onNumberedToggle(checked) {
+  numberedQuestions = checked;
+  if (document.getElementById('sec-preview').classList.contains('active')) renderPreview();
+}
 
 // Active form ID — mutable so we can load different forms from the list
 let FORM_ID = getOrCreateFormId();
@@ -1502,6 +1512,8 @@ async function editForm(id) {
     setActiveFormId(form.id);
     document.getElementById('form-title').value = form.title || '';
     document.getElementById('form-desc').value = form.desc || '';
+    numberedQuestions = !!form.numbered;
+    document.getElementById('numbered-toggle').checked = numberedQuestions;
 
     // Reconstruct questions — preserve IDs so existing submissions still match
     qs = (form.questions || []).map(q => ({ ...q }));
@@ -1558,6 +1570,8 @@ function newForm() {
 
   document.getElementById('form-title').value = 'My Form';
   document.getElementById('form-desc').value = '';
+  numberedQuestions = false;
+  document.getElementById('numbered-toggle').checked = false;
   qs = [];
   qIdx = 0;
   renderBuild();
@@ -1758,7 +1772,9 @@ function buildPrintQuestions() {
       </div>`;
     }
     qNum++;
-    const label = q.label || `Question ${qNum}`;
+    const label = q.label
+      ? (numberedQuestions ? `${qNum}. ${q.label}` : q.label)
+      : `Question ${qNum}`;
     const reqMark = q.required ? ' <span style="color:#c0392b">*</span>' : '';
     let answerHtml = '';
     if (['short','email','number','date'].includes(q.type)) {
@@ -1931,6 +1947,7 @@ function getFormPayload() {
     title: document.getElementById('form-title').value.trim() || 'My Form',
     desc: document.getElementById('form-desc').value.trim() || '',
     questions: qs.map(q => ({ ...q })),
+    numbered: numberedQuestions,
   };
 }
 
@@ -2108,6 +2125,7 @@ function renderPreview() {
   const el = document.getElementById('preview-content');
   if (!qs.length) { el.innerHTML = '<div class="empty">No questions to preview.</div>'; return; }
 
+  let pvQNum = 0;
   const fields = qs.map(q => {
     if (q.type === 'section') {
       return `<div style="border-left:3px solid var(--accent);padding:0.5rem 0 0.5rem 1rem;margin:0.5rem 0;">
@@ -2115,8 +2133,9 @@ function renderPreview() {
         ${q.desc ? `<div style="font-size:13px;color:var(--text2);margin-top:2px">${esc(q.desc)}</div>` : ''}
       </div>`;
     }
+    pvQNum++;
     const req = q.required ? `<span class="req">*</span>` : '';
-    const lbl = q.label || 'Untitled question';
+    const lbl = numberedQuestions ? `${pvQNum}. ${q.label || 'Untitled question'}` : (q.label || 'Untitled question');
     let inp = '';
     if (['short','email','number'].includes(q.type)) {
       const t = q.type === 'email' ? 'email' : q.type === 'number' ? 'number' : 'text';
@@ -2213,6 +2232,10 @@ function applyAIChanges(changes) {
   }
   if (changes.formDesc !== undefined) {
     document.getElementById('form-desc').value = changes.formDesc;
+  }
+  if (changes.numbered !== undefined) {
+    numberedQuestions = !!changes.numbered;
+    document.getElementById('numbered-toggle').checked = numberedQuestions;
   }
   if (changes.cover) {
     const c = changes.cover;
