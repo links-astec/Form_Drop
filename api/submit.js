@@ -26,22 +26,85 @@ async function ensureTables() {
   `);
 }
 
+// Column layout is built to import cleanly into SPSS — see the matching comment
+// in analytics.html's buildExportColumns() for the full rationale. Checkbox
+// questions become one 0/1 column per option instead of a joined "A, B, C" cell.
+function buildExportColumns(questions) {
+  const cols = [];
+  questions.forEach((q, i) => {
+    if (q.type === "section") return;
+    const label = q.label || `Question ${i + 1}`;
+
+    if (q.type === "checkbox") {
+      (q.options || []).forEach((opt) => {
+        cols.push({
+          header: `${label} - ${opt}`,
+          get: (ans) => {
+            const v = ans[q.id];
+            const vals = Array.isArray(v) ? v : v ? [v] : [];
+            return vals.includes(opt) ? 1 : 0;
+          },
+        });
+      });
+      if (q.allowOther) {
+        cols.push({
+          header: `${label} - Other`,
+          get: (ans) => {
+            const v = ans[q.id];
+            const vals = Array.isArray(v) ? v : v ? [v] : [];
+            return vals.some((x) => x === "Other" || (typeof x === "string" && x.startsWith("Other:"))) ? 1 : 0;
+          },
+        });
+        cols.push({
+          header: `${label} - Other (specify)`,
+          get: (ans) => {
+            const v = ans[q.id];
+            const vals = Array.isArray(v) ? v : v ? [v] : [];
+            const other = vals.find((x) => typeof x === "string" && x.startsWith("Other:"));
+            return other ? other.slice(6).trim() : "";
+          },
+        });
+      }
+    } else if (q.type === "number") {
+      cols.push({
+        header: label,
+        get: (ans) => {
+          const v = ans[q.id];
+          if (v === undefined || v === null || v === "") return "";
+          const n = Number(v);
+          return isNaN(n) ? v : n;
+        },
+      });
+    } else {
+      cols.push({
+        header: label,
+        get: (ans) => {
+          const v = ans[q.id];
+          return Array.isArray(v) ? v.join(", ") : v ?? "";
+        },
+      });
+    }
+  });
+  return cols;
+}
+
 function buildXLSX(formTitle, questions, submissions) {
+  const cols = buildExportColumns(questions);
+  const hasRespondents = submissions.some((s) => s.respondent_name);
   const header = [
     "Submission #",
     "Submitted At",
-    ...questions.map((q, i) => q.label || `Question ${i + 1}`)
+    ...(hasRespondents ? ["Respondent"] : []),
+    ...cols.map((c) => c.header),
   ];
   const rows = submissions.map((sub, idx) => [
     idx + 1,
     new Date(sub.submitted_at).toLocaleString(),
-    ...questions.map((q) => {
-      const v = sub.answers[q.id];
-      return Array.isArray(v) ? v.join(", ") : v || "";
-    }),
+    ...(hasRespondents ? [sub.respondent_name || ""] : []),
+    ...cols.map((c) => c.get(sub.answers || {})),
   ]);
   const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
-  ws["!cols"] = [{ wch: 14 }, { wch: 22 }, ...questions.map(() => ({ wch: 30 }))];
+  ws["!cols"] = [{ wch: 14 }, { wch: 22 }, ...(hasRespondents ? [{ wch: 20 }] : []), ...cols.map(() => ({ wch: 24 }))];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Responses");
   return XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
@@ -91,7 +154,7 @@ module.exports = async function handler(req, res) {
     );
 
     const { rows: allSubs } = await query(
-      `SELECT answers, submitted_at FROM submissions WHERE form_id = $1 ORDER BY submitted_at ASC`,
+      `SELECT answers, submitted_at, respondent_name FROM submissions WHERE form_id = $1 ORDER BY submitted_at ASC`,
       [formId]
     );
 

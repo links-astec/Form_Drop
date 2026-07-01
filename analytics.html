@@ -520,20 +520,74 @@ function renderTable(form, submissions) {
   table.innerHTML = `<thead><tr>${thead}</tr></thead><tbody>${rows}</tbody>`;
 }
 
-/* ── Export ────────────────────────────────────────────────────────────────── */
+/* ── Export ────────────────────────────────────────────────────────────────────
+   Column layout is built to import cleanly into SPSS:
+   - Each checkbox (multi-select) question becomes one 0/1 column PER OPTION
+     (SPSS has no native way to read a single "A, B, C" cell as a multi-response
+     set — separate dichotomy columns is the standard layout it expects), plus an
+     "Other" flag column and an "Other (specify)" text column when applicable.
+   - Number questions are written as real numbers, not text, so SPSS auto-detects
+     them as a numeric/scale variable instead of a string.
+   - Radio/dropdown/text questions stay a single column — SPSS imports those as
+     categorical/string variables directly, no transform needed.
+   ──────────────────────────────────────────────────────────────────────────── */
+function buildExportColumns(questions) {
+  const cols = [];
+  questions.forEach((q, i) => {
+    if (q.type === 'section') return;
+    const label = q.label || `Question ${i+1}`;
+
+    if (q.type === 'checkbox') {
+      (q.options || []).forEach(opt => {
+        cols.push({ header: `${label} - ${opt}`, get: ans => {
+          const v = ans[q.id];
+          const vals = Array.isArray(v) ? v : (v ? [v] : []);
+          return vals.includes(opt) ? 1 : 0;
+        }});
+      });
+      if (q.allowOther) {
+        cols.push({ header: `${label} - Other`, get: ans => {
+          const v = ans[q.id];
+          const vals = Array.isArray(v) ? v : (v ? [v] : []);
+          return vals.some(x => x === 'Other' || (typeof x === 'string' && x.startsWith('Other:'))) ? 1 : 0;
+        }});
+        cols.push({ header: `${label} - Other (specify)`, get: ans => {
+          const v = ans[q.id];
+          const vals = Array.isArray(v) ? v : (v ? [v] : []);
+          const other = vals.find(x => typeof x === 'string' && x.startsWith('Other:'));
+          return other ? other.slice(6).trim() : '';
+        }});
+      }
+    } else if (q.type === 'number') {
+      cols.push({ header: label, get: ans => {
+        const v = ans[q.id];
+        if (v === undefined || v === null || v === '') return '';
+        const n = Number(v);
+        return isNaN(n) ? v : n;
+      }});
+    } else {
+      cols.push({ header: label, get: ans => {
+        const v = ans[q.id];
+        return Array.isArray(v) ? v.join(', ') : (v ?? '');
+      }});
+    }
+  });
+  return cols;
+}
+
 function exportXLSX() {
   if (!currentData) return;
   const { form, submissions } = currentData;
-  const header = ['Submission #', 'Submitted At', ...form.questions.map((q,i) => q.label||`Question ${i+1}`)];
+  const cols = buildExportColumns(form.questions);
+  const hasRespondents = submissions.some(s => s.respondentName);
+  const header = ['Submission #', 'Submitted At', ...(hasRespondents ? ['Respondent'] : []), ...cols.map(c => c.header)];
   const rows = submissions.map((s, idx) => {
     const date = new Date(s.submittedAt).toLocaleString();
-    return [idx+1, date, ...form.questions.map(q => {
-      const v = s.answers?.[q.id];
-      return Array.isArray(v) ? v.join(', ') : (v||'');
-    })];
+    const ans = s.answers || {};
+    return [idx+1, date, ...(hasRespondents ? [s.respondentName || ''] : []), ...cols.map(c => c.get(ans))];
   });
   const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
-  ws['!cols'] = [{wch:14},{wch:22},...form.questions.map(()=>({wch:28}))];
+  ws['!cols'] = [{wch:14},{wch:22}, ...(hasRespondents ? [{wch:20}] : []), ...cols.map(()=>({wch:24}))];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Responses');
   XLSX.writeFile(wb, (form.title||'responses').replace(/[^a-z0-9]/gi,'_')+'_responses.xlsx');
