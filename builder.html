@@ -1799,7 +1799,7 @@ function buildPrintQuestions() {
       answerHtml = `<div style="border:1.5pt dashed #aaa;border-radius:4pt;padding:10pt;text-align:center;margin-top:4pt;color:#888;font-size:10pt;">📎 Attach document / file here</div>`;
     }
     return `<div class="q-card" style="page-break-inside:avoid">
-      <input class="q-label-input" value="${esc(label)}${reqMark}" readonly style="font-weight:600;white-space:normal;word-break:break-word;pointer-events:none"/>
+      <div class="q-label-input" style="font-weight:600;white-space:normal;word-break:break-word;pointer-events:none">${esc(label)}${reqMark}</div>
       ${answerHtml}
     </div>`;
   }).join('');
