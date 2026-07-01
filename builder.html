@@ -2376,6 +2376,48 @@ function applyAIChanges(changes) {
   }
 }
 
+// Detects a "Q: ...\nA: ..." structured paste (the template we tell users to use
+// for recording real/extracted answers) and extracts every pair with regex.
+// Mapping 30+ answers to the right question is a lot to ask an LLM to get exactly
+// right in one shot — when the text is already this structured, a deterministic
+// parser is both more reliable and doesn't cost an API call.
+function looksLikeQARecord(text) {
+  const qCount = (text.match(/^\s*Q\s*:/gim) || []).length;
+  const aCount = (text.match(/^\s*A\s*:/gim) || []).length;
+  return qCount >= 2 && aCount >= 2;
+}
+
+function parseQAPairs(text) {
+  const pairs = [];
+  const re = /Q\s*:\s*([\s\S]*?)\n\s*A\s*:\s*([\s\S]*?)(?=\n\s*Q\s*:|\s*$)/gi;
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    const q = m[1].trim();
+    const a = m[2].trim();
+    if (q && a) pairs.push({ q, a });
+  }
+  return pairs;
+}
+
+function parseRespondentNameFromText(text) {
+  const m = text.match(/\bfor\s*[\(\[]?\s*([^\n\)\]\.,]{1,80})\s*[\)\]]?/i);
+  return m ? m[1].trim() : '';
+}
+
+// Handles a structured Q:/A: paste entirely client-side — no AI call needed.
+// Reuses submitParsedResponse()'s existing id/label/number resolver and option
+// value-snapping, same as the AI-driven path uses.
+async function handleDirectQARecord(userText) {
+  const pairs = parseQAPairs(userText);
+  if (!pairs.length) {
+    addAIMessage('assistant', 'I saw "Q:"/"A:" markers but couldn\'t parse any complete pairs — make sure each question starts a new line with "Q:" and its answer starts the next line with "A:".');
+    return;
+  }
+  const answers = {};
+  pairs.forEach(p => { answers[p.q] = p.a; });
+  await submitParsedResponse({ respondentName: parseRespondentNameFromText(userText), answers });
+}
+
 async function sendAI() {
   const input = document.getElementById('ai-input');
   const userText = input.value.trim();
@@ -2388,6 +2430,13 @@ async function sendAI() {
   addAIMessage('user', userText);
   // Hide suggestions after first message
   document.getElementById('ai-suggestions').style.display = 'none';
+
+  // Structured Q:/A: pastes are handled directly — see handleDirectQARecord for why.
+  if (looksLikeQARecord(userText)) {
+    await handleDirectQARecord(userText);
+    document.getElementById('ai-send-btn').disabled = false;
+    return;
+  }
 
   const thinking = addAIMessage('thinking', '✦ Thinking…');
 
@@ -2768,6 +2817,20 @@ async function submitParsedResponse(sub) {
   // than requiring an exact id match.
   const answerableQuestions = qs.filter(q => q.type !== 'section');
   const norm = s => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  // Generic words that dominate short question labels ("What is your ...?") and
+  // would otherwise make unrelated questions look similar — stripped before
+  // comparing so matches are driven by actual distinctive content.
+  const QA_STOPWORDS = new Set(['what','is','your','the','of','are','do','you','this','that','a','an','in','on','to','for','and','or','does','did','will','would','should','could','has','have','had','be','being','been','if','yes','no','not','any','which','who','whom','how','when','where','why','along','about','with','from','near','at','can','their']);
+  function contentWords(s) {
+    return new Set(norm(s).replace(/[^\w\s]/g, ' ').split(/\s+/).filter(w => w.length > 2 && !QA_STOPWORDS.has(w)));
+  }
+  function labelSimilarity(a, b) {
+    const wa = contentWords(a), wb = contentWords(b);
+    if (!wa.size || !wb.size) return 0;
+    let overlap = 0;
+    wa.forEach(w => { if (wb.has(w)) overlap++; });
+    return overlap / Math.max(wa.size, wb.size);
+  }
   function resolveQuestionId(key) {
     const byId = answerableQuestions.find(q => q.id === key);
     if (byId) return byId.id;
@@ -2778,6 +2841,16 @@ async function submitParsedResponse(sub) {
     if (m) {
       const idx = parseInt(m[1], 10) - 1;
       if (idx >= 0 && idx < answerableQuestions.length) return answerableQuestions[idx].id;
+    }
+    // Fuzzy fallback for paraphrased questions — only accept a clear, unambiguous
+    // winner (high score AND a real margin over the runner-up) so a vague partial
+    // match can never silently overwrite the wrong question's answer.
+    const scored = answerableQuestions
+      .map(q => ({ q, score: labelSimilarity(key, q.label) }))
+      .sort((a, b) => b.score - a.score);
+    const best = scored[0], second = scored[1];
+    if (best && best.score >= 0.5 && (!second || best.score - second.score >= 0.15 || best.score >= 0.75)) {
+      return best.q.id;
     }
     return null;
   }
@@ -2790,7 +2863,15 @@ async function submitParsedResponse(sub) {
       const match = q.options.find(o => norm(o) === norm(val));
       return match !== undefined ? match : val;
     };
-    return q.type === 'checkbox' ? (Array.isArray(v) ? v : [v]).map(snapOne) : snapOne(v);
+    if (q.type !== 'checkbox') return snapOne(v);
+    // Checkbox answers are documented as semicolon-separated ("A; B") — split into
+    // one option per selection instead of treating the whole string as one value.
+    let parts = Array.isArray(v) ? v : String(v).split(';');
+    if (parts.length === 1 && !q.options.some(o => norm(o) === norm(parts[0]))) {
+      const commaParts = String(parts[0]).split(',');
+      if (commaParts.length > 1) parts = commaParts;
+    }
+    return parts.map(s => snapOne(String(s).trim())).filter(Boolean);
   }
 
   const answers = {};
