@@ -55,11 +55,29 @@ module.exports = async function handler(req, res) {
 
   // POST /api/forms — upsert a form definition
   if (req.method === "POST") {
-    const { id, title, desc, questions, numbered } = req.body;
+    const { id, title, desc, questions, numbered, confirmClear } = req.body;
     if (!id || !title || !Array.isArray(questions)) {
       return res.status(400).json({ ok: false, error: "id, title, and questions are required" });
     }
     try {
+      // Guard against silently wiping a form's questions. This happens if a client
+      // ends up with an empty in-memory question list (e.g. a stale/failed load)
+      // and then saves — without this check that blindly overwrites real, saved
+      // work with nothing. Only blocks the "had questions, now saving zero" case;
+      // normal edits (removing a couple of questions) are unaffected.
+      if (questions.length === 0 && !confirmClear) {
+        const { rows: existing } = await query(
+          `SELECT jsonb_array_length(questions) AS qcount FROM forms WHERE id = $1`,
+          [id]
+        );
+        if (existing.length && existing[0].qcount > 0) {
+          return res.status(409).json({
+            ok: false,
+            error: `This form already has ${existing[0].qcount} saved question(s), but you're about to save it with none. Reload the form before saving, or confirm you want to clear it.`,
+            existingQuestionCount: existing[0].qcount,
+          });
+        }
+      }
       await query(`
         INSERT INTO forms (id, title, description, questions, numbered, updated_at)
         VALUES ($1, $2, $3, $4, $5, NOW())

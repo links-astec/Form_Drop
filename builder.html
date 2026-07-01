@@ -1971,6 +1971,28 @@ async function saveFormToServer() {
     catch(parseErr) {
       return { ok: false, error: `Server returned an unexpected response (HTTP ${r.status}). Check your DATABASE_URL environment variable is set in Vercel.` };
     }
+
+    // Server refused to overwrite a form that has saved questions with an empty
+    // editor — this usually means the editor never actually loaded the real form.
+    // Never silently accept this; make the user explicitly confirm data loss.
+    if (r.status === 409 && j.existingQuestionCount !== undefined) {
+      const wipe = confirm(
+        `This form already has ${j.existingQuestionCount} saved question(s) on the server, but your editor is currently empty.\n\n` +
+        `Click OK to permanently delete them and save an empty form, or Cancel to stop — then reload it via My Forms → Edit before making changes.`
+      );
+      if (!wipe) {
+        return { ok: false, error: 'Save cancelled — reload the form (My Forms → Edit) before saving to avoid losing the saved questions.' };
+      }
+      const r2 = await fetch(serverUrl + '/forms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...payload, confirmClear: true }),
+        signal: AbortSignal.timeout(12000),
+      });
+      try { return await r2.json(); }
+      catch(e) { return { ok: false, error: `Server returned an unexpected response (HTTP ${r2.status}).` }; }
+    }
+
     return j;
   } catch(e) {
     if (e.name === 'TimeoutError' || e.name === 'AbortError') {
