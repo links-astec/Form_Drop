@@ -2437,7 +2437,11 @@ You can make changes to the form by returning a JSON "changes" object. You MUST 
     "createRespondents": [
       { "name": "respondent's name (required)", "persona": "short persona description — required if they should be usable for AI-generated answers", "email": "optional" }
     ],
-    "fillWithRespondents": "optional — 'all', or an array of respondent names/ids (new or existing) from the saved respondents list above"
+    "fillWithRespondents": "optional — 'all', or an array of respondent names/ids (new or existing) from the saved respondents list above",
+    "submitResponse": {
+      "respondentName": "optional label for who this response is from",
+      "answers": { "<questionId>": "<the REAL answer value the user gave you, matched to that question>" }
+    }
   }
 }
 
@@ -2454,6 +2458,11 @@ Rules:
   - Use "all" to fill with every respondent that has an AI persona
   - Use an array of specific respondent names (or ids) when the user names specific people — this also matches respondents you just created in this same "changes" object
   - If the user names someone who isn't in the saved respondents list and you weren't asked to create them, or asks to use a respondent without an AI persona, explain that in "message" instead and leave "fillWithRespondents" out
+- If the user gives you REAL answers to record (e.g. pastes answers they already collected/extracted from a paper form, an interview, another survey tool, etc.) — as opposed to asking you to invent/simulate a response — use "submitResponse" instead of "fillWithRespondents":
+  - Map each answer the user gave you to the matching question's id using the form's questions above
+  - For radio/dropdown questions, the value must exactly match one of that question's "options" (map the user's wording to the closest option); for checkbox questions, the value must be an array of matching options
+  - Only include question ids the user actually gave you an answer for — never invent or guess an answer for a question they didn't address, just omit that id entirely
+  - This creates one real, permanent submission — do this only when the user is providing actual answer data they want recorded, not when generating test/simulated data (use fillWithRespondents for that)
 - Always respond with valid JSON only — no markdown, no backticks, no extra text`;
 
   try {
@@ -2492,6 +2501,9 @@ Rules:
       }
       if (parsed.changes.fillWithRespondents) {
         await runRespondentFill(parsed.changes.fillWithRespondents);
+      }
+      if (parsed.changes.submitResponse) {
+        await submitParsedResponse(parsed.changes.submitResponse);
       }
     }
   } catch(e) {
@@ -2655,7 +2667,22 @@ Rules:
     const raw = data.content?.[0]?.text || '';
     const clean = raw.replace(/^```[a-z]*\n?/,'').replace(/\n?```$/,'').trim();
     const parsed = JSON.parse(clean);
-    const answers = parsed.answers || {};
+
+    // The model doesn't always wrap answers in {"answers": {...}} despite the
+    // instruction — sometimes it returns the question-id map at the top level.
+    // Fall back to treating the whole object as the answer map in that case.
+    let answers = parsed.answers;
+    if (!answers || typeof answers !== 'object' || Array.isArray(answers)) {
+      const { answers: _a, message: _m, ...rest } = parsed;
+      answers = rest;
+    }
+    // Only keep keys that actually match a question on this form — drop anything
+    // hallucinated — and refuse to submit a response with zero real answers.
+    const validIds = new Set(answerableQuestions.map(q => q.id));
+    answers = Object.fromEntries(Object.entries(answers).filter(([k]) => validIds.has(k)));
+    if (!Object.keys(answers).length) {
+      throw new Error('AI did not return any usable answers for this form — try again.');
+    }
 
     if (statusEl) { statusEl.textContent = 'Submitting…'; }
 
@@ -2715,6 +2742,52 @@ async function createRespondentsFromAI(list) {
     addAIMessage('assistant', `Added respondent${names.length===1?'':'s'}: ${names.join(', ')}.`);
   } else {
     addAIMessage('assistant', "I couldn't save the new respondent(s) — check the Respondents tab and try again.");
+  }
+}
+
+// Called by the AI assistant when the user gives it real answers to record (as
+// opposed to asking it to invent/simulate a response) — e.g. answers extracted
+// from a paper form or another source, pasted into chat. Submits exactly the
+// answers the AI mapped to question ids; unlike generateAIResponse, there's no
+// second AI call here — sendAI's own response already did the mapping.
+async function submitParsedResponse(sub) {
+  const serverUrl = getServerUrl();
+  if (!serverUrl) {
+    addAIMessage('assistant', "I can't submit that response right now — the server isn't connected. Check the Email alerts tab.");
+    return;
+  }
+  if (!FORM_ID) {
+    addAIMessage('assistant', 'Save this form first (Share & QR tab) before submitting a response.');
+    return;
+  }
+
+  const validIds = new Set(qs.filter(q => q.type !== 'section').map(q => q.id));
+  const answers = Object.fromEntries(
+    Object.entries(sub.answers || {}).filter(([k, v]) => validIds.has(k) && v !== '' && v !== null && v !== undefined)
+  );
+  if (!Object.keys(answers).length) {
+    addAIMessage('assistant', "I couldn't match those answers to any questions on this form — try rephrasing which question each answer belongs to.");
+    return;
+  }
+
+  try {
+    const r = await fetch(serverUrl + '/submit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        formId: FORM_ID,
+        formTitle: document.getElementById('form-title').value || 'My Form',
+        questions: qs,
+        answers,
+        respondentName: sub.respondentName || undefined,
+      }),
+      signal: AbortSignal.timeout(15000),
+    });
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.error || 'Submission failed');
+    addAIMessage('assistant', `Recorded that response${sub.respondentName ? ' for ' + sub.respondentName : ''} — ${Object.keys(answers).length} of ${validIds.size} question(s) answered. Check Analytics to see it.`);
+  } catch(e) {
+    addAIMessage('assistant', 'Could not submit that response: ' + e.message);
   }
 }
 
