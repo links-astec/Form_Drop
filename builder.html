@@ -1384,6 +1384,7 @@ header {
     <button class="ai-suggestion" onclick="aiSuggest(this)">Write a cover page for me</button>
     <button class="ai-suggestion" onclick="aiSuggest(this)">Make all questions required</button>
     <button class="ai-suggestion" onclick="aiSuggest(this)">Improve my question labels</button>
+    <button class="ai-suggestion" onclick="aiSuggest(this)">Fill this form using all my respondents</button>
   </div>
   <div class="ai-input-area">
     <textarea class="ai-textarea" id="ai-input" placeholder="Ask anything or paste text to generate questions…" rows="1"
@@ -2264,11 +2265,21 @@ async function sendAI() {
 
   const thinking = addAIMessage('thinking', '✦ Thinking…');
 
+  // Keep the respondents list fresh so the AI knows who it can generate responses for
+  if (!respondents.length) { await loadRespondents(); }
+  const respondentsInfo = respondents.map(r => ({
+    id: r.id, name: r.name, hasAIPersona: !!(r.persona && r.persona.trim()),
+  }));
+
   const formContext = getFormContext();
   const systemPrompt = `You are an AI assistant built into FormDrop, a form builder app. Your job is to help the user build, edit, and improve their forms.
 
 The user's current form state is:
 ${JSON.stringify(formContext, null, 2)}
+
+Saved respondents (people who can fill out this form) are:
+${JSON.stringify(respondentsInfo, null, 2)}
+Only respondents with "hasAIPersona": true can be auto-filled — the others need a real person to submit manually.
 
 You can make changes to the form by returning a JSON "changes" object. You MUST respond with valid JSON in this exact format:
 {
@@ -2294,7 +2305,8 @@ You can make changes to the form by returning a JSON "changes" object. You MUST 
       }
     ],
     "deleteQuestionIds": ["optional array of question ids to remove"],
-    "replaceAllQuestions": false
+    "replaceAllQuestions": false,
+    "fillWithRespondents": "optional — 'all', or an array of respondent ids from the saved respondents list above"
   }
 }
 
@@ -2306,6 +2318,10 @@ Rules:
 - To DELETE questions, list their ids in "deleteQuestionIds" — do not omit them from "questions" and expect them to disappear
 - Only set "replaceAllQuestions": true when the user explicitly wants to start over / regenerate the whole form from scratch (e.g. pasting new source text to build a fresh form) — in that case "questions" must contain the complete new list
 - If generating a form from pasted text on an empty or near-empty form, extract meaningful questions, use correct types, set required fields sensibly
+- If the user asks to generate/simulate responses, have respondents fill the form, or create test data, set "fillWithRespondents": each generated response is a real submission that will show up in Analytics, so only do this when asked
+  - Use "all" to fill with every respondent that has an AI persona
+  - Use an array of specific respondent ids (from the list above) when the user names specific people
+  - If the user names someone who isn't in the saved respondents list, or asks to use a respondent without an AI persona, explain that in "message" instead and leave "fillWithRespondents" out
 - Always respond with valid JSON only — no markdown, no backticks, no extra text`;
 
   try {
@@ -2339,6 +2355,9 @@ Rules:
     addAIMessage('assistant', parsed.message || 'Done!');
     if (parsed.changes && Object.keys(parsed.changes).length > 0) {
       applyAIChanges(parsed.changes);
+      if (parsed.changes.fillWithRespondents) {
+        await runRespondentFill(parsed.changes.fillWithRespondents);
+      }
     }
   } catch(e) {
     thinking.remove();
@@ -2525,6 +2544,38 @@ Rules:
   } catch(e) {
     if (statusEl) { statusEl.textContent = '✗ ' + e.message; statusEl.style.color = 'var(--danger)'; }
   }
+}
+
+// Called by the AI assistant when the user asks it to generate responses via respondents.
+// spec is either "all" or an array of respondent ids.
+async function runRespondentFill(spec) {
+  if (!respondents.length) await loadRespondents();
+
+  const aiCapable = r => r.persona && r.persona.trim();
+  let targets;
+  if (spec === 'all') {
+    targets = respondents.filter(aiCapable);
+  } else if (Array.isArray(spec)) {
+    if (spec.length === 1 && spec[0] === 'all') targets = respondents.filter(aiCapable);
+    else targets = respondents.filter(r => spec.includes(r.id) && aiCapable(r));
+  } else {
+    targets = [];
+  }
+
+  if (!targets.length) {
+    addAIMessage('assistant', 'I couldn\'t find any matching respondents with an AI persona to fill this form. Add one in the Respondents tab first.');
+    return;
+  }
+  if (!FORM_ID) {
+    addAIMessage('assistant', 'Save this form first (Share & QR tab) before generating respondent responses.');
+    return;
+  }
+
+  addAIMessage('assistant', `Generating ${targets.length} response${targets.length===1?'':'s'} as ${targets.map(t=>t.name).join(', ')}…`);
+  for (const r of targets) {
+    await generateAIResponse(r.id);
+  }
+  addAIMessage('assistant', `Done — ${targets.length} new response${targets.length===1?'':'s'} submitted. Check the Respondents tab or Analytics to see them.`);
 }
 
 /* ============================================================
