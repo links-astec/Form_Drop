@@ -10,6 +10,7 @@ async function ensureTables() {
       description TEXT,
       questions   JSONB NOT NULL DEFAULT '[]',
       numbered    BOOLEAN NOT NULL DEFAULT false,
+      cover       JSONB NOT NULL DEFAULT '{}',
       created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
@@ -23,6 +24,7 @@ async function ensureTables() {
     CREATE INDEX IF NOT EXISTS submissions_form_id_idx ON submissions(form_id);
     ALTER TABLE submissions ADD COLUMN IF NOT EXISTS respondent_name TEXT;
     ALTER TABLE forms ADD COLUMN IF NOT EXISTS numbered BOOLEAN NOT NULL DEFAULT false;
+    ALTER TABLE forms ADD COLUMN IF NOT EXISTS cover JSONB NOT NULL DEFAULT '{}';
   `);
 }
 
@@ -55,7 +57,7 @@ module.exports = async function handler(req, res) {
 
   // POST /api/forms — upsert a form definition
   if (req.method === "POST") {
-    const { id, title, desc, questions, numbered, confirmClear } = req.body;
+    const { id, title, desc, questions, numbered, cover, confirmClear } = req.body;
     if (!id || !title || !Array.isArray(questions)) {
       return res.status(400).json({ ok: false, error: "id, title, and questions are required" });
     }
@@ -79,15 +81,16 @@ module.exports = async function handler(req, res) {
         }
       }
       await query(`
-        INSERT INTO forms (id, title, description, questions, numbered, updated_at)
-        VALUES ($1, $2, $3, $4, $5, NOW())
+        INSERT INTO forms (id, title, description, questions, numbered, cover, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, NOW())
         ON CONFLICT (id) DO UPDATE
           SET title = EXCLUDED.title,
               description = EXCLUDED.description,
               questions = EXCLUDED.questions,
               numbered = EXCLUDED.numbered,
+              cover = EXCLUDED.cover,
               updated_at = NOW()
-      `, [id, title, desc || "", JSON.stringify(questions), !!numbered]);
+      `, [id, title, desc || "", JSON.stringify(questions), !!numbered, JSON.stringify(cover || {})]);
       res.json({ ok: true });
     } catch (err) {
       console.error("Save form error:", err);
@@ -113,7 +116,7 @@ module.exports = async function handler(req, res) {
 
     try {
       const { rows } = await query(
-        `SELECT id, title, description, questions, numbered FROM forms WHERE id = $1`,
+        `SELECT id, title, description, questions, numbered, cover FROM forms WHERE id = $1`,
         [formId]
       );
       if (!rows.length) {
@@ -128,6 +131,7 @@ module.exports = async function handler(req, res) {
           desc: form.description,
           questions: form.questions,
           numbered: form.numbered,
+          cover: form.cover,
         },
       });
     } catch (err) {

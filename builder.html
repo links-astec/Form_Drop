@@ -789,8 +789,11 @@ header {
   #questions-list { display: none !important; }
   /* Hide cover editor body UI (inputs shown via print overlay, not the editor) */
   .cover-editor-body { display: none !important; }
-  /* Cover page */
-  .print-cover { display: block !important; page-break-after: always; min-height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 3cm 2cm; }
+  /* Cover page — min-height is intentionally NOT 100vh: vh is measured against the
+     browser's print viewport, not the physical page, and reliably overflows onto a
+     second (blank) page once padding is added. 22cm safely fits one A4/Letter page
+     including default browser print margins, and still reads as a full cover. */
+  .print-cover { display: flex !important; flex-direction: column; justify-content: center; align-items: center; text-align: center; page-break-after: always; min-height: 22cm; padding: 3cm 2cm; }
   .print-cover-logo { max-width: 160pt; max-height: 100pt; object-fit: contain; margin-bottom: 32pt; }
   .print-cover-title { font-size: 32pt; font-weight: 700; color: #000; line-height: 1.2; word-break: break-word; white-space: normal; margin-bottom: 12pt; }
   .print-cover-subtitle { font-size: 16pt; color: #444; margin-bottom: 8pt; word-break: break-word; white-space: normal; }
@@ -1515,6 +1518,7 @@ async function editForm(id) {
     document.getElementById('form-desc').value = form.desc || '';
     numberedQuestions = !!form.numbered;
     document.getElementById('numbered-toggle').checked = numberedQuestions;
+    applyCoverData(form.cover);
 
     // Reconstruct questions — preserve IDs so existing submissions still match
     qs = (form.questions || []).map(q => ({ ...q }));
@@ -1573,6 +1577,7 @@ function newForm() {
   document.getElementById('form-desc').value = '';
   numberedQuestions = false;
   document.getElementById('numbered-toggle').checked = false;
+  applyCoverData({});
   qs = [];
   qIdx = 0;
   renderBuild();
@@ -1949,7 +1954,39 @@ function getFormPayload() {
     desc: document.getElementById('form-desc').value.trim() || '',
     questions: qs.map(q => ({ ...q })),
     numbered: numberedQuestions,
+    cover: getCoverData(),
   };
+}
+
+// Restores the cover page editor (headline/subtitle/date/desc/logo) from saved
+// form data — used when loading a form for editing so an added cover isn't lost.
+function applyCoverData(cover) {
+  cover = cover || {};
+  document.getElementById('cover-headline').value = cover.headline || '';
+  document.getElementById('cover-subtitle').value = cover.subtitle || '';
+  document.getElementById('cover-date').value = cover.date || '';
+  document.getElementById('cover-desc').value = cover.desc || '';
+
+  const logoImg = document.getElementById('cover-logo-preview');
+  const removeLogoBtn = document.getElementById('remove-logo-btn');
+  const miniLogo = document.getElementById('cover-mini-logo');
+  if (cover.hasLogo && cover.logo) {
+    logoImg.src = cover.logo;
+    logoImg.classList.add('show');
+    removeLogoBtn.style.display = '';
+  } else {
+    logoImg.src = '';
+    logoImg.classList.remove('show');
+    removeLogoBtn.style.display = 'none';
+    if (miniLogo) { miniLogo.src = ''; miniLogo.style.display = 'none'; }
+  }
+
+  const hasAny = !!(cover.headline || cover.subtitle || cover.date || cover.desc || cover.hasLogo);
+  coverOpen = hasAny;
+  document.getElementById('cover-editor-body').classList.toggle('hidden', !coverOpen);
+  document.getElementById('cover-toggle-label').textContent = coverOpen ? '− Hide' : '+ Add cover';
+
+  updateCoverPreview();
 }
 
 async function saveFormToServer() {
@@ -2311,8 +2348,10 @@ async function sendAI() {
 
   const thinking = addAIMessage('thinking', '✦ Thinking…');
 
-  // Keep the respondents list fresh so the AI knows who it can generate responses for
-  if (!respondents.length) { await loadRespondents(); }
+  // Always refresh so the AI sees respondents added/edited earlier in this session
+  // (not just on the very first message) — otherwise a just-added respondent can
+  // be missing from its context.
+  await loadRespondents();
   const respondentsInfo = respondents.map(r => ({
     id: r.id, name: r.name, hasAIPersona: !!(r.persona && r.persona.trim()),
   }));
@@ -2593,23 +2632,37 @@ Rules:
 }
 
 // Called by the AI assistant when the user asks it to generate responses via respondents.
-// spec is either "all" or an array of respondent ids.
+// spec is meant to be "all" or an array of respondent ids, but the model doesn't
+// always follow that shape exactly — it may return a bare string instead of an
+// array, or echo a respondent's name instead of its id. Handle all of those.
 async function runRespondentFill(spec) {
   if (!respondents.length) await loadRespondents();
 
   const aiCapable = r => r.persona && r.persona.trim();
+  const norm = s => String(s || '').trim().toLowerCase();
+
+  const wantAll = spec === 'all' ||
+    (Array.isArray(spec) && spec.some(s => norm(s) === 'all'));
+
   let targets;
-  if (spec === 'all') {
+  if (wantAll) {
     targets = respondents.filter(aiCapable);
-  } else if (Array.isArray(spec)) {
-    if (spec.length === 1 && spec[0] === 'all') targets = respondents.filter(aiCapable);
-    else targets = respondents.filter(r => spec.includes(r.id) && aiCapable(r));
   } else {
-    targets = [];
+    const wanted = (Array.isArray(spec) ? spec : [spec]).map(norm).filter(Boolean);
+    targets = respondents.filter(r =>
+      aiCapable(r) && wanted.some(w => w === norm(r.id) || w === norm(r.name))
+    );
   }
 
   if (!targets.length) {
-    addAIMessage('assistant', 'I couldn\'t find any matching respondents with an AI persona to fill this form. Add one in the Respondents tab first.');
+    const withPersona = respondents.filter(aiCapable);
+    if (!respondents.length) {
+      addAIMessage('assistant', 'You don\'t have any saved respondents yet. Add one in the Respondents tab first.');
+    } else if (!withPersona.length) {
+      addAIMessage('assistant', `You have ${respondents.length} respondent(s), but none of them have an AI persona set — a persona is required for me to generate answers. Open the Respondents tab and add one to whoever you want me to use.`);
+    } else {
+      addAIMessage('assistant', `I couldn't match that to a respondent with an AI persona. Respondents I can use: ${withPersona.map(r=>r.name).join(', ')}.`);
+    }
     return;
   }
   if (!FORM_ID) {
