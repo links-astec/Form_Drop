@@ -2761,10 +2761,47 @@ async function submitParsedResponse(sub) {
     return;
   }
 
-  const validIds = new Set(qs.filter(q => q.type !== 'section').map(q => q.id));
-  const answers = Object.fromEntries(
-    Object.entries(sub.answers || {}).filter(([k, v]) => validIds.has(k) && v !== '' && v !== null && v !== undefined)
-  );
+  // The model doesn't reliably key answers by internal question id (e.g. "q6") —
+  // when the user pastes "Q: <question text>" it very often echoes the question
+  // text itself as the key instead of looking up the id. Resolve each key against
+  // the form's questions using id, exact label text, or a leading number, rather
+  // than requiring an exact id match.
+  const answerableQuestions = qs.filter(q => q.type !== 'section');
+  const norm = s => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  function resolveQuestionId(key) {
+    const byId = answerableQuestions.find(q => q.id === key);
+    if (byId) return byId.id;
+    const normKey = norm(key);
+    const byLabel = answerableQuestions.find(q => norm(q.label) === normKey);
+    if (byLabel) return byLabel.id;
+    const m = String(key || '').trim().match(/^(?:q(?:uestion)?\s*)?(\d+)[\.\):]?\s*$/i);
+    if (m) {
+      const idx = parseInt(m[1], 10) - 1;
+      if (idx >= 0 && idx < answerableQuestions.length) return answerableQuestions[idx].id;
+    }
+    return null;
+  }
+  // Snap the answer text to the question's actual option wording where possible,
+  // so minor formatting differences (dashes, casing, extra spaces) from the model
+  // don't stop it from aggregating correctly in Analytics charts.
+  function resolveAnswerValue(q, v) {
+    if (!q || !Array.isArray(q.options) || !['radio', 'dropdown', 'checkbox'].includes(q.type)) return v;
+    const snapOne = val => {
+      const match = q.options.find(o => norm(o) === norm(val));
+      return match !== undefined ? match : val;
+    };
+    return q.type === 'checkbox' ? (Array.isArray(v) ? v : [v]).map(snapOne) : snapOne(v);
+  }
+
+  const answers = {};
+  Object.entries(sub.answers || {}).forEach(([k, v]) => {
+    if (v === '' || v === null || v === undefined) return;
+    const qid = resolveQuestionId(k);
+    if (!qid) return;
+    const q = answerableQuestions.find(qq => qq.id === qid);
+    answers[qid] = resolveAnswerValue(q, v);
+  });
+
   if (!Object.keys(answers).length) {
     addAIMessage('assistant', "I couldn't match those answers to any questions on this form — try rephrasing which question each answer belongs to.");
     return;
@@ -2785,7 +2822,7 @@ async function submitParsedResponse(sub) {
     });
     const j = await r.json();
     if (!j.ok) throw new Error(j.error || 'Submission failed');
-    addAIMessage('assistant', `Recorded that response${sub.respondentName ? ' for ' + sub.respondentName : ''} — ${Object.keys(answers).length} of ${validIds.size} question(s) answered. Check Analytics to see it.`);
+    addAIMessage('assistant', `Recorded that response${sub.respondentName ? ' for ' + sub.respondentName : ''} — ${Object.keys(answers).length} of ${answerableQuestions.length} question(s) answered. Check Analytics to see it.`);
   } catch(e) {
     addAIMessage('assistant', 'Could not submit that response: ' + e.message);
   }
