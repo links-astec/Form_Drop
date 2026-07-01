@@ -770,6 +770,7 @@ header {
   header, .tabs, .mobile-nav, .header-actions, .add-q-bar,
   .share-grid, .email-config-card, .steps-list,
   .toast, #sec-email, #sec-share, #sec-forms, #sec-preview, #sec-respondents,
+  .numbered-toggle-row,
   .q-top, .q-delete, .q-type-select, .q-required-toggle,
   .preview-bar, .pv-submit,
   /* AI panel and backdrop — always hide on print */
@@ -1192,7 +1193,7 @@ header {
     <div class="form-title-wrap">
       <input class="form-title-input" id="form-title" type="text" placeholder="Untitled form" value="My Form"/>
       <textarea class="form-desc-input" id="form-desc" placeholder="Add a description (optional)" rows="1"></textarea>
-      <label style="display:flex;align-items:center;gap:8px;margin-top:12px;font-size:13px;color:var(--text2);cursor:pointer;user-select:none;">
+      <label class="numbered-toggle-row" style="display:flex;align-items:center;gap:8px;margin-top:12px;font-size:13px;color:var(--text2);cursor:pointer;user-select:none;">
         <input type="checkbox" id="numbered-toggle" onchange="onNumberedToggle(this.checked)" style="width:16px;height:16px;accent-color:var(--accent);cursor:pointer;"/>
         Number the questions (1, 2, 3…) when respondents fill this form
       </label>
