@@ -1377,7 +1377,7 @@ header {
 <!-- AI Panel -->
 <div class="ai-panel" id="ai-panel">
   <div class="ai-panel-header">
-    <div class="ai-panel-title"><span>✦</span> AI Assistant <span id="ai-build-tag" style="font-size:10px;font-weight:400;color:var(--text3);margin-left:4px;">build 2026-07-02-a</span></div>
+    <div class="ai-panel-title"><span>✦</span> AI Assistant <span id="ai-build-tag" style="font-size:10px;font-weight:400;color:var(--text3);margin-left:4px;">build 2026-07-02-b</span></div>
     <button class="ai-close" onclick="closeAI()">×</button>
   </div>
   <div class="ai-messages" id="ai-messages">
@@ -1502,6 +1502,28 @@ function renderFormsList(forms) {
   }).join('');
 }
 
+// Populates all builder state (title, desc, cover, numbering, questions) from a
+// form record fetched from the server. Shared by editForm() and
+// ensureFormLoaded() so both stay in sync.
+function applyLoadedForm(form) {
+  setActiveFormId(form.id);
+  document.getElementById('form-title').value = form.title || '';
+  document.getElementById('form-desc').value = form.desc || '';
+  numberedQuestions = !!form.numbered;
+  document.getElementById('numbered-toggle').checked = numberedQuestions;
+  applyCoverData(form.cover);
+
+  // Reconstruct questions — preserve IDs so existing submissions still match
+  qs = (form.questions || []).map(q => ({ ...q }));
+  // Make sure qIdx won't collide with existing IDs
+  qIdx = qs.reduce((max, q) => {
+    const n = parseInt((q.id || '').replace('q', ''), 10);
+    return isNaN(n) ? max : Math.max(max, n);
+  }, 0);
+
+  renderBuild();
+}
+
 async function editForm(id) {
   const serverUrl = getServerUrl();
   if (!serverUrl) { toast('Server not connected'); return; }
@@ -1513,29 +1535,37 @@ async function editForm(id) {
     try { j = JSON.parse(text); } catch(e) { throw new Error('Server error'); }
     if (!j.ok || !j.form) throw new Error(j.error || 'Form not found');
 
-    const form = j.form;
-    // Load into builder state
-    setActiveFormId(form.id);
-    document.getElementById('form-title').value = form.title || '';
-    document.getElementById('form-desc').value = form.desc || '';
-    numberedQuestions = !!form.numbered;
-    document.getElementById('numbered-toggle').checked = numberedQuestions;
-    applyCoverData(form.cover);
-
-    // Reconstruct questions — preserve IDs so existing submissions still match
-    qs = (form.questions || []).map(q => ({ ...q }));
-    // Make sure qIdx won't collide with existing IDs
-    qIdx = qs.reduce((max, q) => {
-      const n = parseInt((q.id || '').replace('q', ''), 10);
-      return isNaN(n) ? max : Math.max(max, n);
-    }, 0);
-
-    renderBuild();
+    applyLoadedForm(j.form);
     switchTab('build');
     toast('Form loaded — edit and save to update it');
   } catch(e) {
     toast('Could not load form: ' + e.message);
   }
+}
+
+// The builder does NOT auto-load a form's saved questions on page open — that
+// only happens via the explicit "Edit" click in My Forms. If someone opens the
+// AI chat without ever doing that, `qs` is empty even though FORM_ID correctly
+// points at their real saved form, so every question-matching feature would
+// silently have nothing to match against no matter how correct the input is.
+// Call this before any AI/respondent action that reads `qs`.
+let _ensureFormLoadedPromise = null;
+async function ensureFormLoaded() {
+  if (qs.length > 0) return; // already has content — never clobber in-progress local edits
+  const serverUrl = getServerUrl();
+  if (!serverUrl || !FORM_ID) return;
+  if (_ensureFormLoadedPromise) return _ensureFormLoadedPromise;
+  _ensureFormLoadedPromise = (async () => {
+    try {
+      const r = await fetch(serverUrl + '/forms/' + encodeURIComponent(FORM_ID), { signal: AbortSignal.timeout(8000) });
+      const j = await r.json();
+      if (j.ok && j.form && (j.form.questions || []).length) {
+        applyLoadedForm(j.form);
+      }
+    } catch(e) { /* new/unsaved form — nothing to load, that's fine */ }
+  })();
+  await _ensureFormLoadedPromise;
+  _ensureFormLoadedPromise = null;
 }
 
 function shareForm(id) {
@@ -2327,6 +2357,18 @@ function getFormContext() {
   };
 }
 
+// Only these fields belong on a question definition. The AI has, at least once,
+// invented an extra field (e.g. "response") to attach an answer directly onto a
+// question instead of using submitResponse/fillWithRespondents — which corrupts
+// the saved form schema itself (every respondent would then see that stray
+// data). Strip anything outside this whitelist before it can ever reach `qs`.
+const QUESTION_SCHEMA_KEYS = new Set(['id','type','label','required','options','allowOther','fileTypes','maxSizeMB','title','desc']);
+function sanitizeQuestion(q) {
+  const clean = {};
+  Object.keys(q || {}).forEach(k => { if (QUESTION_SCHEMA_KEYS.has(k)) clean[k] = q[k]; });
+  return clean;
+}
+
 function applyAIChanges(changes) {
   if (!changes) return;
 
@@ -2351,16 +2393,17 @@ function applyAIChanges(changes) {
   }
   if (changes.replaceAllQuestions) {
     // Explicit full regeneration — only wipes existing questions when the AI asks for it
-    qs = (changes.questions || []).map(q => ({ ...q, id: q.id || uid() }));
+    qs = (changes.questions || []).map(q => ({ ...sanitizeQuestion(q), id: q.id || uid() }));
   } else if (changes.questions) {
     // Default: non-destructive merge — update matched IDs in place, append anything new,
     // and leave every question the AI didn't mention untouched.
-    changes.questions.forEach(q => {
-      const existingIdx = q.id ? qs.findIndex(e => e.id === q.id) : -1;
+    changes.questions.forEach(rawQ => {
+      const q = sanitizeQuestion(rawQ);
+      const existingIdx = rawQ.id ? qs.findIndex(e => e.id === rawQ.id) : -1;
       if (existingIdx !== -1) {
         qs[existingIdx] = { ...qs[existingIdx], ...q };
       } else {
-        qs.push({ ...q, id: q.id || uid() });
+        qs.push({ ...q, id: rawQ.id || uid() });
       }
     });
   }
@@ -2521,6 +2564,10 @@ async function sendAI() {
   // Hide suggestions after first message
   document.getElementById('ai-suggestions').style.display = 'none';
 
+  // Make sure the active form's real questions are actually loaded — see
+  // ensureFormLoaded() for why this matters.
+  await ensureFormLoaded();
+
   // Structured Q:/A: or plain numbered-list pastes are handled directly, with no
   // AI call — see handleDirectQARecord/handleDirectNumberedRecord for why.
   if (looksLikeQARecord(userText)) {
@@ -2593,6 +2640,7 @@ You can make changes to the form by returning a JSON "changes" object. You MUST 
 Rules:
 - "changes" can omit any key you're not changing — only include what actually changes
 - "questions" is a PARTIAL list: only include questions you are adding or updating. Any existing question you don't mention is left exactly as-is — you never need to repeat the full form back.
+- NEVER put a respondent's answer value onto a question object itself (e.g. no "response"/"answer" field inside a "questions" entry) — that corrupts the form's design and every future respondent would see it. A real recorded answer always goes through "submitResponse" or "fillWithRespondents" instead, never through "questions".
 - To ADD a new question, include it in the questions array with a new id (e.g. "q_new_1")
 - To UPDATE an existing question, use its existing id and only the fields that changed
 - To DELETE questions, list their ids in "deleteQuestionIds" — do not omit them from "questions" and expect them to disappear
@@ -2776,6 +2824,9 @@ async function generateAIResponse(id) {
   const serverUrl = getServerUrl();
   if (!serverUrl) { if (statusEl) statusEl.textContent = 'Server not connected'; return; }
   if (!FORM_ID) { if (statusEl) statusEl.textContent = 'Save the form first'; return; }
+
+  await ensureFormLoaded();
+  if (!qs.length) { if (statusEl) statusEl.textContent = 'This form has no questions to fill'; return; }
 
   if (statusEl) { statusEl.textContent = 'Generating answers…'; statusEl.style.color = 'var(--text2)'; }
 
