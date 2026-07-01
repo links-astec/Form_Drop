@@ -1,25 +1,11 @@
 const nodemailer = require("nodemailer");
 const XLSX = require("xlsx");
-const { Pool } = require("pg");
+const { query } = require("./_db");
 
-let _pool = null;
 let _tablesReady = false;
 
-function getPool() {
-  if (!_pool) {
-    _pool = new Pool({
-      connectionString: process.env.DATABASE_URL,
-      ssl: process.env.DATABASE_URL && process.env.DATABASE_URL.includes("localhost")
-        ? false
-        : { rejectUnauthorized: false },
-      max: 3,
-    });
-  }
-  return _pool;
-}
-
-async function ensureTables(pool) {
-  await pool.query(`
+async function ensureTables() {
+  await query(`
     CREATE TABLE IF NOT EXISTS forms (
       id          TEXT PRIMARY KEY,
       title       TEXT NOT NULL,
@@ -96,16 +82,15 @@ module.exports = async function handler(req, res) {
   const toEmail = process.env.TO_EMAIL;
   if (!toEmail) return res.status(500).json({ ok: false, error: "TO_EMAIL not configured" });
 
-  const pool = getPool();
   try {
-    await ensureTables(pool);
+    if (!_tablesReady) { await ensureTables(); _tablesReady = true; }
 
-    await pool.query(
+    await query(
       `INSERT INTO submissions (form_id, answers, respondent_name) VALUES ($1, $2, $3)`,
       [formId, JSON.stringify(answers), respondentName || null]
     );
 
-    const { rows: allSubs } = await pool.query(
+    const { rows: allSubs } = await query(
       `SELECT answers, submitted_at FROM submissions WHERE form_id = $1 ORDER BY submitted_at ASC`,
       [formId]
     );

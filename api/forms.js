@@ -1,23 +1,9 @@
-const { Pool } = require("pg");
+const { query } = require("./_db");
 
-let _pool = null;
 let _tablesReady = false;
 
-function getPool() {
-  if (!_pool) {
-    _pool = new Pool({
-      connectionString: process.env.DATABASE_URL,
-      ssl: process.env.DATABASE_URL && process.env.DATABASE_URL.includes("localhost")
-        ? false
-        : { rejectUnauthorized: false },
-      max: 3,
-    });
-  }
-  return _pool;
-}
-
-async function ensureTables(pool) {
-  await pool.query(`
+async function ensureTables() {
+  await query(`
     CREATE TABLE IF NOT EXISTS forms (
       id          TEXT PRIMARY KEY,
       title       TEXT NOT NULL,
@@ -27,12 +13,14 @@ async function ensureTables(pool) {
       updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
     CREATE TABLE IF NOT EXISTS submissions (
-      id           BIGSERIAL PRIMARY KEY,
-      form_id      TEXT NOT NULL REFERENCES forms(id) ON DELETE CASCADE,
-      answers      JSONB NOT NULL DEFAULT '{}',
-      submitted_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      id             BIGSERIAL PRIMARY KEY,
+      form_id        TEXT NOT NULL REFERENCES forms(id) ON DELETE CASCADE,
+      answers        JSONB NOT NULL DEFAULT '{}',
+      submitted_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      respondent_name TEXT
     );
     CREATE INDEX IF NOT EXISTS submissions_form_id_idx ON submissions(form_id);
+    ALTER TABLE submissions ADD COLUMN IF NOT EXISTS respondent_name TEXT;
   `);
 }
 
@@ -54,9 +42,8 @@ module.exports = async function handler(req, res) {
     });
   }
 
-  const pool = getPool();
   try {
-    if (!_tablesReady) { await ensureTables(pool); _tablesReady = true; }
+    if (!_tablesReady) { await ensureTables(); _tablesReady = true; }
   } catch (dbErr) {
     return res.status(500).json({
       ok: false,
@@ -71,7 +58,7 @@ module.exports = async function handler(req, res) {
       return res.status(400).json({ ok: false, error: "id, title, and questions are required" });
     }
     try {
-      await pool.query(`
+      await query(`
         INSERT INTO forms (id, title, description, questions, updated_at)
         VALUES ($1, $2, $3, $4, NOW())
         ON CONFLICT (id) DO UPDATE
@@ -100,7 +87,7 @@ module.exports = async function handler(req, res) {
     }
 
     try {
-      const { rows } = await pool.query(
+      const { rows } = await query(
         `SELECT id, title, description, questions FROM forms WHERE id = $1`,
         [formId]
       );

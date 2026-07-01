@@ -1,18 +1,4 @@
-const { Pool } = require("pg");
-
-let _pool = null;
-function getPool() {
-  if (!_pool) {
-    _pool = new Pool({
-      connectionString: process.env.DATABASE_URL,
-      ssl: process.env.DATABASE_URL && process.env.DATABASE_URL.includes("localhost")
-        ? false
-        : { rejectUnauthorized: false },
-      max: 3,
-    });
-  }
-  return _pool;
-}
+const { query } = require("./_db");
 
 function setCors(res) {
   res.setHeader("Access-Control-Allow-Origin", process.env.ALLOWED_ORIGIN || "*");
@@ -32,10 +18,9 @@ module.exports = async function handler(req, res) {
     return res.status(400).json({ ok: false, error: "Form ID required" });
   }
 
-  const pool = getPool();
   try {
     // Form definition
-    const { rows: formRows } = await pool.query(
+    const { rows: formRows } = await query(
       `SELECT id, title, description, questions FROM forms WHERE id = $1`,
       [formId]
     );
@@ -44,7 +29,7 @@ module.exports = async function handler(req, res) {
     }
 
     // All submissions
-    const { rows: subs } = await pool.query(
+    const { rows: subs } = await query(
       `SELECT id, answers, submitted_at, respondent_name FROM submissions WHERE form_id = $1 ORDER BY submitted_at ASC`,
       [formId]
     );
