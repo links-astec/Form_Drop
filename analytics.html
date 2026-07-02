@@ -103,6 +103,23 @@ header{
 .badge{display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;padding:2px 8px;border-radius:30px;background:var(--accent-light);color:var(--accent);min-width:28px}
 .export-row{display:flex;gap:10px;margin-top:1rem;flex-wrap:wrap}
 
+/* ── ADVANCED ANALYSIS ──────────────────────────────────────── */
+.adv-tabs{display:flex;gap:8px;margin:10px 0 16px;flex-wrap:wrap}
+.adv-tab-btn{font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;padding:7px 14px;border-radius:8px;border:1px solid var(--border2);background:var(--surface);color:var(--text2);cursor:pointer;transition:background .15s}
+.adv-tab-btn:hover{background:var(--surface2)}
+.adv-tab-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.adv-panel{display:none}
+.adv-panel.active{display:block}
+.adv-select{font-family:'DM Sans',sans-serif;font-size:13px;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);outline:none;min-width:180px}
+.adv-select:focus{border-color:var(--accent)}
+.adv-controls{display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap;margin-bottom:16px}
+.adv-table{width:100%;border-collapse:collapse;font-size:13px}
+.adv-table th,.adv-table td{padding:8px 10px;border:1px solid var(--border);text-align:center}
+.adv-table th{background:var(--surface2);font-weight:600;color:var(--text2)}
+.adv-table td:first-child,.adv-table th:first-child{text-align:left;font-weight:500}
+.adv-empty{color:var(--text3);font-size:13px;padding:2rem 1rem;text-align:center}
+.adv-hint{font-size:12.5px;color:var(--text2);margin-bottom:14px;line-height:1.6}
+
 /* ── STATES ──────────────────────────────────────────────── */
 .empty-state{text-align:center;padding:4rem 1.5rem;color:var(--text2)}
 .empty-state h2{font-size:20px;font-weight:600;margin-bottom:8px;color:var(--text)}
@@ -390,6 +407,19 @@ function renderAnalytics(data) {
       <div class="timeline-wrap"><canvas id="timeline-canvas"></canvas></div>
     </div>
     <div class="questions-grid" id="q-grid"></div>
+    <div class="table-section" id="adv-section">
+      <div class="section-title">Advanced Analysis</div>
+      <div class="adv-tabs">
+        <button class="adv-tab-btn active" data-adv="desc" onclick="switchAdvTab('desc')">Descriptives</button>
+        <button class="adv-tab-btn" data-adv="crosstab" onclick="switchAdvTab('crosstab')">Crosstab</button>
+        <button class="adv-tab-btn" data-adv="corr" onclick="switchAdvTab('corr')">Correlation</button>
+        <button class="adv-tab-btn" data-adv="segment" onclick="switchAdvTab('segment')">Segment</button>
+      </div>
+      <div class="adv-panel active" id="adv-desc"></div>
+      <div class="adv-panel" id="adv-crosstab"></div>
+      <div class="adv-panel" id="adv-corr"></div>
+      <div class="adv-panel" id="adv-segment"></div>
+    </div>
     <div class="table-section">
       <div class="section-title">All responses</div>
       <div class="resp-table-wrap"><table class="resp-table" id="resp-table"></table></div>
@@ -401,6 +431,7 @@ function renderAnalytics(data) {
   renderTimeline(submissions);
   renderCharts(form, submissions, answered);
   renderTable(form, submissions);
+  renderAdvancedAnalysis(data);
 }
 
 /* ── Timeline chart ────────────────────────────────────────────────────────── */
@@ -518,6 +549,303 @@ function renderTable(form, submissions) {
     return `<tr><td><span class="badge">${i+1}</span></td><td style="white-space:nowrap;color:var(--text2)">${date}</td>${respCell}${cells}</tr>`;
   }).join('');
   table.innerHTML = `<thead><tr>${thead}</tr></thead><tbody>${rows}</tbody>`;
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   ADVANCED ANALYSIS — descriptives, crosstab, correlation, segment/filter.
+   All computed client-side from the same submissions data already loaded.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+// Recognized ordinal/Likert-style option wordings, mapped to a 1-5 (or 1-3)
+// numeric code. A radio/dropdown question is treated as numeric/scale ONLY if
+// every one of its options matches this dictionary — anything else (Farmer /
+// Fisher / Other, etc.) is left as categorical, not coerced into a scale.
+const LIKERT_WORD_VALUES = {
+  'strongly disagree':1,'disagree':2,'neutral':3,'neither agree nor disagree':3,'undecided':3,'agree':4,'strongly agree':5,
+  'very poor':1,'poor':2,'fair':3,'good':4,'excellent':5,
+  'never':1,'rarely':2,'sometimes':3,'often':4,'always':5,
+  'not at all likely':1,'not very likely':2,'somewhat likely':3,'very likely':4,'extremely likely':5,
+  'no':1,'not sure':2,'yes':3,
+};
+function normWord(s) { return String(s || '').toLowerCase().trim(); }
+
+// Returns a function that converts one raw answer into a number, or null if
+// this question isn't numeric/ordinal — used to gate descriptives/correlation
+// to only the questions where a mean/std-dev actually makes sense.
+function getNumericCoder(q) {
+  if (q.type === 'number') {
+    return v => { const n = parseFloat(v); return isNaN(n) ? null : n; };
+  }
+  if ((q.type === 'radio' || q.type === 'dropdown') && Array.isArray(q.options) && q.options.length >= 2) {
+    const allKnown = q.options.every(o => LIKERT_WORD_VALUES[normWord(o)] !== undefined);
+    if (allKnown) {
+      return v => { const val = LIKERT_WORD_VALUES[normWord(Array.isArray(v) ? v[0] : v)]; return val === undefined ? null : val; };
+    }
+  }
+  return null;
+}
+function isCategorical(q) {
+  return (q.type === 'radio' || q.type === 'dropdown') && Array.isArray(q.options) && q.options.length > 0;
+}
+
+/* ── Descriptives ─────────────────────────────────────────────────────────── */
+function computeDescriptives(q, submissions, coder) {
+  const values = [];
+  submissions.forEach(s => {
+    const raw = s.answers?.[q.id];
+    if (raw === undefined || raw === null || raw === '') return;
+    const n = coder(raw);
+    if (n !== null && !isNaN(n)) values.push(n);
+  });
+  if (!values.length) return null;
+  const n = values.length;
+  const mean = values.reduce((a, b) => a + b, 0) / n;
+  const sorted = [...values].sort((a, b) => a - b);
+  const median = n % 2 ? sorted[(n - 1) / 2] : (sorted[n / 2 - 1] + sorted[n / 2]) / 2;
+  const freq = {};
+  values.forEach(v => { freq[v] = (freq[v] || 0) + 1; });
+  const mode = Object.entries(freq).sort((a, b) => b[1] - a[1])[0][0];
+  const variance = n > 1 ? values.reduce((a, b) => a + (b - mean) ** 2, 0) / (n - 1) : 0;
+  return { n, mean, median, mode: Number(mode), std: Math.sqrt(variance), min: sorted[0], max: sorted[n - 1] };
+}
+
+function renderDescriptives(form, submissions) {
+  const el = document.getElementById('adv-desc');
+  const rows = form.questions
+    .filter(q => q.type !== 'section')
+    .map(q => ({ q, coder: getNumericCoder(q) }))
+    .filter(x => x.coder)
+    .map(({ q, coder }) => ({ q, stats: computeDescriptives(q, submissions, coder) }))
+    .filter(x => x.stats);
+
+  if (!rows.length) {
+    el.innerHTML = `<div class="adv-empty">No Likert-scale, agree/disagree, or number questions found. This works automatically for radio/dropdown questions whose options are a recognized scale (e.g. Strongly Disagree…Strongly Agree, Poor…Excellent, Never…Always, Yes/Not sure/No) and for Number-type questions.</div>`;
+    return;
+  }
+  el.innerHTML = `
+    <p class="adv-hint">Mean, median, mode, and standard deviation for every auto-detected Likert-scale and number question. Scale questions are coded 1 (lowest) through 5 (highest).</p>
+    <div class="resp-table-wrap"><table class="adv-table">
+      <thead><tr><th>Question</th><th>N</th><th>Mean</th><th>Median</th><th>Mode</th><th>Std Dev</th><th>Min</th><th>Max</th></tr></thead>
+      <tbody>${rows.map(({ q, stats }) => `
+        <tr>
+          <td>${esc(q.label || '')}</td>
+          <td>${stats.n}</td>
+          <td>${stats.mean.toFixed(2)}</td>
+          <td>${stats.median.toFixed(2)}</td>
+          <td>${stats.mode}</td>
+          <td>${stats.std.toFixed(2)}</td>
+          <td>${stats.min}</td>
+          <td>${stats.max}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table></div>`;
+}
+
+/* ── Crosstab ─────────────────────────────────────────────────────────────── */
+function computeCrosstab(qRow, qCol, submissions) {
+  const rowOpts = qRow.options || [];
+  const colOpts = qCol.options || [];
+  const table = rowOpts.map(() => colOpts.map(() => 0));
+  submissions.forEach(s => {
+    const rv = s.answers?.[qRow.id], cv = s.answers?.[qCol.id];
+    const rvals = Array.isArray(rv) ? rv : (rv ? [rv] : []);
+    const cvals = Array.isArray(cv) ? cv : (cv ? [cv] : []);
+    rvals.forEach(rvv => {
+      const ri = rowOpts.indexOf(rvv);
+      if (ri < 0) return;
+      cvals.forEach(cvv => { const ci = colOpts.indexOf(cvv); if (ci >= 0) table[ri][ci]++; });
+    });
+  });
+  return { rowOpts, colOpts, table };
+}
+
+function renderCrosstabControls(form) {
+  const el = document.getElementById('adv-crosstab');
+  const catQs = form.questions.filter(isCategorical);
+  if (catQs.length < 2) {
+    el.innerHTML = `<div class="adv-empty">Need at least two multiple-choice or dropdown questions to cross-tabulate.</div>`;
+    return;
+  }
+  const opts = catQs.map(q => `<option value="${esc(q.id)}">${esc(q.label || '')}</option>`).join('');
+  el.innerHTML = `
+    <div class="adv-controls">
+      <div><label class="config-label" style="display:block;margin-bottom:5px;">Rows</label><select class="adv-select" id="crosstab-row" onchange="updateCrosstab()">${opts}</select></div>
+      <div><label class="config-label" style="display:block;margin-bottom:5px;">Columns</label><select class="adv-select" id="crosstab-col" onchange="updateCrosstab()">${opts}</select></div>
+      <div><label class="config-label" style="display:block;margin-bottom:5px;">Show</label><select class="adv-select" id="crosstab-mode" onchange="updateCrosstab()">
+        <option value="count">Counts</option>
+        <option value="row">Row %</option>
+        <option value="col">Column %</option>
+      </select></div>
+    </div>
+    <div id="crosstab-result"></div>`;
+  if (catQs.length > 1) document.getElementById('crosstab-col').selectedIndex = 1;
+  updateCrosstab();
+}
+
+function updateCrosstab() {
+  const { form, submissions } = currentData;
+  const rowSel = document.getElementById('crosstab-row'), colSel = document.getElementById('crosstab-col');
+  if (!rowSel || !colSel) return;
+  const qRow = form.questions.find(q => q.id === rowSel.value);
+  const qCol = form.questions.find(q => q.id === colSel.value);
+  const mode = document.getElementById('crosstab-mode').value;
+  const result = document.getElementById('crosstab-result');
+  if (!qRow || !qCol) { result.innerHTML = ''; return; }
+  if (qRow.id === qCol.id) { result.innerHTML = `<div class="adv-empty">Choose two different questions.</div>`; return; }
+
+  const { rowOpts, colOpts, table } = computeCrosstab(qRow, qCol, submissions);
+  const rowTotals = table.map(r => r.reduce((a, b) => a + b, 0));
+  const colTotals = colOpts.map((_, ci) => table.reduce((a, r) => a + r[ci], 0));
+  const grandTotal = rowTotals.reduce((a, b) => a + b, 0);
+
+  function cell(ri, ci) {
+    const v = table[ri][ci];
+    if (mode === 'row') return rowTotals[ri] ? (v / rowTotals[ri] * 100).toFixed(1) + '%' : '0%';
+    if (mode === 'col') return colTotals[ci] ? (v / colTotals[ci] * 100).toFixed(1) + '%' : '0%';
+    return String(v);
+  }
+
+  result.innerHTML = `<div class="resp-table-wrap"><table class="adv-table">
+    <thead><tr><th>${esc(qRow.label)} vs ${esc(qCol.label)}</th>${colOpts.map(c => `<th>${esc(c)}</th>`).join('')}<th>Total</th></tr></thead>
+    <tbody>
+      ${rowOpts.map((r, ri) => `<tr><td>${esc(r)}</td>${colOpts.map((c, ci) => `<td>${cell(ri, ci)}</td>`).join('')}<td><strong>${rowTotals[ri]}</strong></td></tr>`).join('')}
+      <tr><td><strong>Total</strong></td>${colOpts.map((c, ci) => `<td><strong>${colTotals[ci]}</strong></td>`).join('')}<td><strong>${grandTotal}</strong></td></tr>
+    </tbody>
+  </table></div>`;
+}
+
+/* ── Correlation matrix ───────────────────────────────────────────────────── */
+function pearsonCorr(x, y) {
+  const n = x.length;
+  const mx = x.reduce((a, b) => a + b, 0) / n, my = y.reduce((a, b) => a + b, 0) / n;
+  let num = 0, dx = 0, dy = 0;
+  for (let i = 0; i < n; i++) { num += (x[i] - mx) * (y[i] - my); dx += (x[i] - mx) ** 2; dy += (y[i] - my) ** 2; }
+  const denom = Math.sqrt(dx * dy);
+  return denom === 0 ? 0 : num / denom;
+}
+function corrColor(v) {
+  const a = Math.min(1, Math.abs(v));
+  return v >= 0 ? `rgba(42,92,69,${(a * 0.65).toFixed(2)})` : `rgba(192,57,43,${(a * 0.65).toFixed(2)})`;
+}
+
+function renderCorrelationMatrix(form, submissions) {
+  const el = document.getElementById('adv-corr');
+  const codeable = form.questions
+    .filter(q => q.type !== 'section')
+    .map(q => ({ q, coder: getNumericCoder(q) }))
+    .filter(x => x.coder);
+
+  if (codeable.length < 2) {
+    el.innerHTML = `<div class="adv-empty">Need at least two Likert-scale or number questions to compute correlations.</div>`;
+    return;
+  }
+
+  const n = codeable.length;
+  const matrix = [];
+  for (let i = 0; i < n; i++) {
+    matrix.push([]);
+    for (let j = 0; j < n; j++) {
+      if (i === j) { matrix[i].push(1); continue; }
+      const xs = [], ys = [];
+      submissions.forEach(s => {
+        const rawX = s.answers?.[codeable[i].q.id], rawY = s.answers?.[codeable[j].q.id];
+        if (rawX === undefined || rawX === null || rawX === '' || rawY === undefined || rawY === null || rawY === '') return;
+        const vx = codeable[i].coder(rawX), vy = codeable[j].coder(rawY);
+        if (vx !== null && vy !== null && !isNaN(vx) && !isNaN(vy)) { xs.push(vx); ys.push(vy); }
+      });
+      matrix[i].push(xs.length >= 3 ? pearsonCorr(xs, ys) : null);
+    }
+  }
+
+  el.innerHTML = `
+    <p class="adv-hint">Pearson correlation between every pair of Likert-scale/number questions (needs ≥3 shared answers). +1 = move perfectly together, −1 = move perfectly opposite, 0 = unrelated. Hover a row/column for the full question text.</p>
+    <div class="resp-table-wrap"><table class="adv-table" style="font-size:11.5px">
+      <thead><tr><th></th>${codeable.map((c, i) => `<th title="${esc(c.q.label)}">Q${i + 1}</th>`).join('')}</tr></thead>
+      <tbody>
+        ${codeable.map((c, i) => `<tr><td title="${esc(c.q.label)}" style="white-space:nowrap;max-width:240px;overflow:hidden;text-overflow:ellipsis;">Q${i + 1}. ${esc(c.q.label)}</td>${matrix[i].map(v => v === null ? '<td style="color:var(--text3)">—</td>' : `<td style="background:${corrColor(v)}">${v.toFixed(2)}</td>`).join('')}</tr>`).join('')}
+      </tbody>
+    </table></div>`;
+}
+
+/* ── Segment / filter ─────────────────────────────────────────────────────── */
+function renderSegmentControls(form) {
+  const el = document.getElementById('adv-segment');
+  const catQs = form.questions.filter(isCategorical);
+  if (!catQs.length) {
+    el.innerHTML = `<div class="adv-empty">Need at least one multiple-choice or dropdown question to segment by.</div>`;
+    return;
+  }
+  const qOpts = catQs.map(q => `<option value="${esc(q.id)}">${esc(q.label || '')}</option>`).join('');
+  el.innerHTML = `
+    <div class="adv-controls">
+      <div><label class="config-label" style="display:block;margin-bottom:5px;">Segment by</label><select class="adv-select" id="segment-q" onchange="updateSegmentValueOptions()">${qOpts}</select></div>
+      <div><label class="config-label" style="display:block;margin-bottom:5px;">Equal to</label><select class="adv-select" id="segment-val" onchange="updateSegment()"></select></div>
+    </div>
+    <div id="segment-result"></div>`;
+  updateSegmentValueOptions();
+}
+
+function updateSegmentValueOptions() {
+  const { form } = currentData;
+  const q = form.questions.find(qq => qq.id === document.getElementById('segment-q').value);
+  const valSel = document.getElementById('segment-val');
+  valSel.innerHTML = (q.options || []).map(o => `<option value="${esc(o)}">${esc(o)}</option>`).join('');
+  updateSegment();
+}
+
+function updateSegment() {
+  const { form, submissions } = currentData;
+  const qId = document.getElementById('segment-q').value;
+  const val = document.getElementById('segment-val').value;
+  const q = form.questions.find(qq => qq.id === qId);
+  const result = document.getElementById('segment-result');
+  if (!q || !val) { result.innerHTML = ''; return; }
+
+  const segment = submissions.filter(s => {
+    const v = s.answers?.[q.id];
+    return Array.isArray(v) ? v.includes(val) : v === val;
+  });
+
+  if (!segment.length) {
+    result.innerHTML = `<div class="adv-empty">No responses where "${esc(q.label)}" = "${esc(val)}".</div>`;
+    return;
+  }
+
+  const otherQs = form.questions.filter(qq => qq.type !== 'section' && qq.id !== q.id && (isCategorical(qq) || qq.type === 'checkbox'));
+  const cards = otherQs.map(oq => {
+    const tally = {};
+    segment.forEach(s => {
+      const v = s.answers?.[oq.id];
+      const vals = Array.isArray(v) ? v : (v ? [v] : []);
+      vals.forEach(vv => { if (vv) tally[vv] = (tally[vv] || 0) + 1; });
+    });
+    const entries = Object.entries(tally).sort((a, b) => b[1] - a[1]);
+    if (!entries.length) return '';
+    const totalAns = entries.reduce((a, [, c]) => a + c, 0);
+    return `<div class="q-analytics-card">
+      <div class="qa-title">${esc(oq.label || '')}</div>
+      <div class="qa-meta">${segment.length} in segment</div>
+      <div class="legend">${entries.map(([k, c]) => `<div class="legend-item"><span class="legend-label">${esc(k)}</span><span class="legend-pct">${c} (${Math.round(c / totalAns * 100)}%)</span></div>`).join('')}</div>
+    </div>`;
+  }).filter(Boolean);
+
+  result.innerHTML = `
+    <p class="adv-hint"><strong>${segment.length}</strong> of ${submissions.length} responses have "${esc(q.label)}" = "${esc(val)}" (${Math.round(segment.length / submissions.length * 100)}%). Breakdown of other questions within this segment:</p>
+    <div class="questions-grid">${cards.join('') || '<div class="adv-empty">No other multiple-choice/checkbox questions to break down.</div>'}</div>`;
+}
+
+/* ── Tabs + entry point ───────────────────────────────────────────────────── */
+function switchAdvTab(name) {
+  document.querySelectorAll('.adv-tab-btn').forEach(b => b.classList.toggle('active', b.dataset.adv === name));
+  document.querySelectorAll('.adv-panel').forEach(p => p.classList.toggle('active', p.id === 'adv-' + name));
+}
+
+function renderAdvancedAnalysis(data) {
+  const { form, submissions } = data;
+  renderDescriptives(form, submissions);
+  renderCrosstabControls(form);
+  renderCorrelationMatrix(form, submissions);
+  renderSegmentControls(form);
 }
 
 /* ── Export ────────────────────────────────────────────────────────────────────
