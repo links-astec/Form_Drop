@@ -1009,6 +1009,14 @@ header {
   .form-list-actions { width: 100%; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
   .form-list-actions .btn { text-align: center; min-height: 40px; font-size: 13px; }
 
+  /* ── Respondents tab on mobile ── */
+  .resp-card { flex-direction: column; align-items: stretch; padding: 1rem; gap: 10px; }
+  .resp-card-persona { max-width: none; }
+  .resp-card-actions { width: 100%; flex-direction: column; align-items: stretch; }
+  .resp-card-actions .btn { width: 100%; text-align: center; min-height: 44px; font-size: 13.5px; }
+  .resp-status { text-align: center; }
+  .numbered-toggle-row { font-size: 14px; }
+
   /* ── Toast — above bottom nav ── */
   .toast {
     bottom: calc(var(--bottom-nav-h) + var(--safe-bottom) + 12px);

@@ -119,6 +119,7 @@ header{
 .adv-table td:first-child,.adv-table th:first-child{text-align:left;font-weight:500}
 .adv-empty{color:var(--text3);font-size:13px;padding:2rem 1rem;text-align:center}
 .adv-hint{font-size:12.5px;color:var(--text2);margin-bottom:14px;line-height:1.6}
+.adv-export-row{display:flex;justify-content:flex-end;margin-bottom:10px}
 
 /* ── STATES ──────────────────────────────────────────────── */
 .empty-state{text-align:center;padding:4rem 1.5rem;color:var(--text2)}
@@ -140,9 +141,11 @@ header{
     backdrop-filter:blur(10px);
     -webkit-backdrop-filter:blur(10px);
   }
-  .logo{font-size:15px}
-  .header-right{gap:8px}
-  .btn{padding:7px 14px;font-size:13px;border-radius:10px;min-height:38px}
+  .logo{font-size:14px;flex-shrink:0}
+  .header-right{gap:7px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;max-width:58%}
+  .header-right::-webkit-scrollbar{display:none}
+  .header-right .btn{flex-shrink:0}
+  .btn{padding:7px 12px;font-size:12.5px;border-radius:10px;min-height:38px;white-space:nowrap}
 
   /* Main */
   .main{padding:1rem 0.9rem calc(2rem + var(--safe-bottom))}
@@ -187,6 +190,27 @@ header{
   .resp-table th{padding:9px 12px;font-size:11px}
   .resp-table td{padding:9px 12px;font-size:12px}
 
+  /* Advanced Analysis — scrollable tab bar instead of wrapping buttons */
+  .adv-tabs{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;margin:8px -0.9rem 14px;padding:0 0.9rem 4px;scrollbar-width:none}
+  .adv-tabs::-webkit-scrollbar{display:none}
+  .adv-tab-btn{flex-shrink:0;padding:8px 14px;font-size:12.5px;min-height:38px}
+  /* Controls stack full-width, native-size inputs to avoid iOS zoom-on-focus */
+  .adv-controls{flex-direction:column;align-items:stretch;gap:10px;margin-bottom:14px}
+  .adv-select{width:100%;min-width:0;font-size:16px;padding:11px 12px;min-height:46px;border-radius:10px}
+  .adv-hint{font-size:12px}
+  /* Dense tables (crosstab/correlation) stay legible and horizontally scrollable */
+  .adv-table{font-size:11.5px}
+  .adv-table th,.adv-table td{padding:7px 8px}
+  .adv-empty{padding:1.75rem 1rem;font-size:12.5px}
+  /* Hint that wide tables (esp. the correlation matrix) scroll sideways */
+  #adv-crosstab .resp-table-wrap,#adv-corr .resp-table-wrap{position:relative}
+  #adv-crosstab .resp-table-wrap::after,#adv-corr .resp-table-wrap::after{
+    content:'⇠ scroll ⇢';display:block;text-align:center;font-size:10.5px;color:var(--text3);
+    padding:6px 0 2px;
+  }
+  .adv-export-row{justify-content:stretch}
+  .adv-export-row .btn{width:100%;min-height:44px;font-size:13.5px}
+
   /* Export */
   .export-row{flex-direction:column;gap:8px}
   .export-row .btn{
@@ -207,6 +231,8 @@ header{
   .page-title{font-size:18px}
   .config-input{font-size:15px}
   .chart-wrap{flex-direction:column;align-items:flex-start}
+  .logo{font-size:12.5px}
+  .btn{padding:6px 10px;font-size:12px}
 }
 </style>
 </head>
@@ -215,7 +241,7 @@ header{
   <div class="logo"><div class="logo-dot"></div>FormDrop Analytics</div>
   <div class="header-right">
     <button class="btn" onclick="window.location.href='builder.html'">← Builder</button>
-    <button class="btn" id="export-pdf-btn" onclick="exportPDF()" style="display:none">Export PDF</button>
+    <button class="btn" id="export-pdf-btn" onclick="exportPDF(this)" style="display:none">Export PDF</button>
     <button class="btn btn-primary" id="export-btn" onclick="exportXLSX()" style="display:none">Export XLSX</button>
   </div>
 </header>
@@ -247,6 +273,7 @@ header{
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <script>
 const COLORS=['#2a5c45','#4a9e7d','#f59e0b','#3b82f6','#ec4899','#8b5cf6','#ef4444','#14b8a6','#f97316','#6366f1'];
 
@@ -623,22 +650,25 @@ function renderDescriptives(form, submissions) {
     return;
   }
   el.innerHTML = `
-    <p class="adv-hint">Mean, median, mode, and standard deviation for every auto-detected Likert-scale and number question. Scale questions are coded 1 (lowest) through 5 (highest).</p>
-    <div class="resp-table-wrap"><table class="adv-table">
-      <thead><tr><th>Question</th><th>N</th><th>Mean</th><th>Median</th><th>Mode</th><th>Std Dev</th><th>Min</th><th>Max</th></tr></thead>
-      <tbody>${rows.map(({ q, stats }) => `
-        <tr>
-          <td>${esc(q.label || '')}</td>
-          <td>${stats.n}</td>
-          <td>${stats.mean.toFixed(2)}</td>
-          <td>${stats.median.toFixed(2)}</td>
-          <td>${stats.mode}</td>
-          <td>${stats.std.toFixed(2)}</td>
-          <td>${stats.min}</td>
-          <td>${stats.max}</td>
-        </tr>`).join('')}
-      </tbody>
-    </table></div>`;
+    <div class="adv-export-row"><button class="btn" onclick="saveElementAsImage('adv-desc-content', 'descriptives', this)">📷 Save as image</button></div>
+    <div id="adv-desc-content">
+      <p class="adv-hint">Mean, median, mode, and standard deviation for every auto-detected Likert-scale and number question. Scale questions are coded 1 (lowest) through 5 (highest).</p>
+      <div class="resp-table-wrap"><table class="adv-table">
+        <thead><tr><th>Question</th><th>N</th><th>Mean</th><th>Median</th><th>Mode</th><th>Std Dev</th><th>Min</th><th>Max</th></tr></thead>
+        <tbody>${rows.map(({ q, stats }) => `
+          <tr>
+            <td>${esc(q.label || '')}</td>
+            <td>${stats.n}</td>
+            <td>${stats.mean.toFixed(2)}</td>
+            <td>${stats.median.toFixed(2)}</td>
+            <td>${stats.mode}</td>
+            <td>${stats.std.toFixed(2)}</td>
+            <td>${stats.min}</td>
+            <td>${stats.max}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table></div>
+    </div>`;
 }
 
 /* ── Crosstab ─────────────────────────────────────────────────────────────── */
@@ -677,6 +707,7 @@ function renderCrosstabControls(form) {
         <option value="col">Column %</option>
       </select></div>
     </div>
+    <div class="adv-export-row"><button class="btn" onclick="saveElementAsImage('crosstab-result', 'crosstab', this)">📷 Save as image</button></div>
     <div id="crosstab-result"></div>`;
   if (catQs.length > 1) document.getElementById('crosstab-col').selectedIndex = 1;
   updateCrosstab();
@@ -758,13 +789,16 @@ function renderCorrelationMatrix(form, submissions) {
   }
 
   el.innerHTML = `
-    <p class="adv-hint">Pearson correlation between every pair of Likert-scale/number questions (needs ≥3 shared answers). +1 = move perfectly together, −1 = move perfectly opposite, 0 = unrelated. Hover a row/column for the full question text.</p>
-    <div class="resp-table-wrap"><table class="adv-table" style="font-size:11.5px">
-      <thead><tr><th></th>${codeable.map((c, i) => `<th title="${esc(c.q.label)}">Q${i + 1}</th>`).join('')}</tr></thead>
-      <tbody>
-        ${codeable.map((c, i) => `<tr><td title="${esc(c.q.label)}" style="white-space:nowrap;max-width:240px;overflow:hidden;text-overflow:ellipsis;">Q${i + 1}. ${esc(c.q.label)}</td>${matrix[i].map(v => v === null ? '<td style="color:var(--text3)">—</td>' : `<td style="background:${corrColor(v)}">${v.toFixed(2)}</td>`).join('')}</tr>`).join('')}
-      </tbody>
-    </table></div>`;
+    <div class="adv-export-row"><button class="btn" onclick="saveElementAsImage('adv-corr-content', 'correlation_matrix', this)">📷 Save as image</button></div>
+    <div id="adv-corr-content">
+      <p class="adv-hint">Pearson correlation between every pair of Likert-scale/number questions (needs ≥3 shared answers). +1 = move perfectly together, −1 = move perfectly opposite, 0 = unrelated. Hover a row/column for the full question text.</p>
+      <div class="resp-table-wrap"><table class="adv-table" style="font-size:11.5px">
+        <thead><tr><th></th>${codeable.map((c, i) => `<th title="${esc(c.q.label)}">Q${i + 1}</th>`).join('')}</tr></thead>
+        <tbody>
+          ${codeable.map((c, i) => `<tr><td title="${esc(c.q.label)}" style="white-space:nowrap;max-width:240px;overflow:hidden;text-overflow:ellipsis;">Q${i + 1}. ${esc(c.q.label)}</td>${matrix[i].map(v => v === null ? '<td style="color:var(--text3)">—</td>' : `<td style="background:${corrColor(v)}">${v.toFixed(2)}</td>`).join('')}</tr>`).join('')}
+        </tbody>
+      </table></div>
+    </div>`;
 }
 
 /* ── Segment / filter ─────────────────────────────────────────────────────── */
@@ -781,6 +815,7 @@ function renderSegmentControls(form) {
       <div><label class="config-label" style="display:block;margin-bottom:5px;">Segment by</label><select class="adv-select" id="segment-q" onchange="updateSegmentValueOptions()">${qOpts}</select></div>
       <div><label class="config-label" style="display:block;margin-bottom:5px;">Equal to</label><select class="adv-select" id="segment-val" onchange="updateSegment()"></select></div>
     </div>
+    <div class="adv-export-row"><button class="btn" onclick="saveElementAsImage('segment-result', 'segment', this)">📷 Save as image</button></div>
     <div id="segment-result"></div>`;
   updateSegmentValueOptions();
 }
@@ -848,6 +883,30 @@ function renderAdvancedAnalysis(data) {
   renderSegmentControls(form);
 }
 
+function filenameBase() {
+  return ((currentData && currentData.form && currentData.form.title) || 'analysis').replace(/[^a-z0-9]/gi, '_');
+}
+
+// Snapshots any DOM element (a table, a whole panel, etc.) as a downloadable PNG.
+// Used by the "📷 Save as image" buttons throughout Advanced Analysis so any
+// individual result — descriptives, a crosstab, the correlation matrix, a
+// segment breakdown — can be shared or dropped straight into a report.
+async function saveElementAsImage(elId, nameSuffix, btn) {
+  const el = document.getElementById(elId);
+  if (!el || typeof html2canvas === 'undefined') return;
+  const prevText = btn ? btn.textContent : null;
+  if (btn) { btn.disabled = true; btn.textContent = 'Rendering…'; }
+  try {
+    const canvas = await html2canvas(el, { backgroundColor: '#ffffff', scale: 2 });
+    const a = document.createElement('a');
+    a.download = `${filenameBase()}_${nameSuffix}.png`;
+    a.href = canvas.toDataURL('image/png');
+    a.click();
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = prevText; }
+  }
+}
+
 /* ── Export ────────────────────────────────────────────────────────────────────
    Column layout is built to import cleanly into SPSS:
    - Each checkbox (multi-select) question becomes one 0/1 column PER OPTION
@@ -903,6 +962,99 @@ function buildExportColumns(questions) {
   return cols;
 }
 
+/* ── Advanced Analysis sheet builders — reused by exportXLSX() ─────────────── */
+function addDescriptivesSheet(wb, form, submissions) {
+  const rows = form.questions
+    .filter(q => q.type !== 'section')
+    .map(q => ({ q, coder: getNumericCoder(q) }))
+    .filter(x => x.coder)
+    .map(({ q, coder }) => ({ q, stats: computeDescriptives(q, submissions, coder) }))
+    .filter(x => x.stats);
+  if (!rows.length) return;
+  const aoa = [
+    ['Question', 'N', 'Mean', 'Median', 'Mode', 'Std Dev', 'Min', 'Max'],
+    ...rows.map(({ q, stats }) => [q.label, stats.n, +stats.mean.toFixed(3), +stats.median.toFixed(3), stats.mode, +stats.std.toFixed(3), stats.min, stats.max]),
+  ];
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [{ wch: 45 }, { wch: 6 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 9 }, { wch: 6 }, { wch: 6 }];
+  XLSX.utils.book_append_sheet(wb, ws, 'Descriptives');
+}
+
+function addCorrelationSheet(wb, form, submissions) {
+  const codeable = form.questions
+    .filter(q => q.type !== 'section')
+    .map(q => ({ q, coder: getNumericCoder(q) }))
+    .filter(x => x.coder);
+  if (codeable.length < 2) return;
+  const n = codeable.length;
+  const aoa = [['', ...codeable.map((c, i) => 'Q' + (i + 1))]];
+  for (let i = 0; i < n; i++) {
+    const row = [`Q${i + 1}. ${codeable[i].q.label}`];
+    for (let j = 0; j < n; j++) {
+      if (i === j) { row.push(1); continue; }
+      const xs = [], ys = [];
+      submissions.forEach(s => {
+        const rawX = s.answers?.[codeable[i].q.id], rawY = s.answers?.[codeable[j].q.id];
+        if (rawX == null || rawX === '' || rawY == null || rawY === '') return;
+        const vx = codeable[i].coder(rawX), vy = codeable[j].coder(rawY);
+        if (vx != null && vy != null && !isNaN(vx) && !isNaN(vy)) { xs.push(vx); ys.push(vy); }
+      });
+      row.push(xs.length >= 3 ? +pearsonCorr(xs, ys).toFixed(3) : '');
+    }
+    aoa.push(row);
+  }
+  aoa.push([]);
+  aoa.push(['Question key:']);
+  codeable.forEach((c, i) => aoa.push([`Q${i + 1}`, c.q.label]));
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [{ wch: 45 }, ...codeable.map(() => ({ wch: 7 }))];
+  XLSX.utils.book_append_sheet(wb, ws, 'Correlation Matrix');
+}
+
+// Uses whatever the user currently has selected in the Crosstab/Segment tabs —
+// exports the on-screen result, not a fixed default.
+function addCrosstabSheet(wb, form, submissions) {
+  const rowSel = document.getElementById('crosstab-row'), colSel = document.getElementById('crosstab-col');
+  if (!rowSel || !colSel) return;
+  const qRow = form.questions.find(q => q.id === rowSel.value), qCol = form.questions.find(q => q.id === colSel.value);
+  if (!qRow || !qCol || qRow.id === qCol.id) return;
+  const { rowOpts, colOpts, table } = computeCrosstab(qRow, qCol, submissions);
+  const aoa = [[`${qRow.label} \\ ${qCol.label}`, ...colOpts, 'Total']];
+  rowOpts.forEach((r, ri) => aoa.push([r, ...table[ri], table[ri].reduce((a, b) => a + b, 0)]));
+  const colTotals = colOpts.map((_, ci) => table.reduce((a, r) => a + r[ci], 0));
+  aoa.push(['Total', ...colTotals, colTotals.reduce((a, b) => a + b, 0)]);
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [{ wch: 30 }, ...colOpts.map(() => ({ wch: 16 })), { wch: 10 }];
+  XLSX.utils.book_append_sheet(wb, ws, 'Crosstab');
+}
+
+function addSegmentSheet(wb, form, submissions) {
+  const qSel = document.getElementById('segment-q'), valSel = document.getElementById('segment-val');
+  if (!qSel || !valSel || !valSel.value) return;
+  const q = form.questions.find(qq => qq.id === qSel.value);
+  const val = valSel.value;
+  const segment = submissions.filter(s => { const v = s.answers?.[q.id]; return Array.isArray(v) ? v.includes(val) : v === val; });
+  if (!segment.length) return;
+  const otherQs = form.questions.filter(qq => qq.type !== 'section' && qq.id !== q.id && (isCategorical(qq) || qq.type === 'checkbox'));
+  const aoa = [[`Segment: ${q.label} = ${val}`], [`${segment.length} of ${submissions.length} responses (${Math.round(segment.length / submissions.length * 100)}%)`], []];
+  otherQs.forEach(oq => {
+    const tally = {};
+    segment.forEach(s => {
+      const v = s.answers?.[oq.id];
+      const vals = Array.isArray(v) ? v : (v ? [v] : []);
+      vals.forEach(vv => { if (vv) tally[vv] = (tally[vv] || 0) + 1; });
+    });
+    const entries = Object.entries(tally).sort((a, b) => b[1] - a[1]);
+    if (!entries.length) return;
+    aoa.push([oq.label]);
+    entries.forEach(([k, c]) => aoa.push(['', k, c]));
+    aoa.push([]);
+  });
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [{ wch: 45 }, { wch: 35 }, { wch: 8 }];
+  XLSX.utils.book_append_sheet(wb, ws, 'Segment');
+}
+
 function exportXLSX() {
   if (!currentData) return;
   const { form, submissions } = currentData;
@@ -918,12 +1070,31 @@ function exportXLSX() {
   ws['!cols'] = [{wch:14},{wch:22}, ...(hasRespondents ? [{wch:20}] : []), ...cols.map(()=>({wch:24}))];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Responses');
+
+  // Advanced Analysis sheets — each is skipped automatically if there isn't
+  // enough data (e.g. no Likert questions, or the Crosstab/Segment tabs were
+  // never given a selection).
+  addDescriptivesSheet(wb, form, submissions);
+  addCorrelationSheet(wb, form, submissions);
+  addCrosstabSheet(wb, form, submissions);
+  addSegmentSheet(wb, form, submissions);
+
   XLSX.writeFile(wb, (form.title||'responses').replace(/[^a-z0-9]/gi,'_')+'_responses.xlsx');
 }
 
 /* ── PDF export — full analytics report (summary, charts, per-question breakdown) ── */
-function exportPDF() {
+async function exportPDF(btn) {
   if (!currentData || !window.jspdf) return;
+  const prevText = btn ? btn.textContent : null;
+  if (btn) { btn.disabled = true; btn.textContent = 'Rendering…'; }
+  try {
+    await buildAndSavePDF();
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = prevText; }
+  }
+}
+
+async function buildAndSavePDF() {
   const { form, submissions, total } = currentData;
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ unit: 'pt', format: 'a4' });
@@ -1037,6 +1208,145 @@ function exportPDF() {
     }
     y += 16;
   });
+
+  /* ── Advanced Analysis ────────────────────────────────────────────────── */
+  const descRows = form.questions
+    .filter(q => q.type !== 'section')
+    .map(q => ({ q, coder: getNumericCoder(q) }))
+    .filter(x => x.coder)
+    .map(({ q, coder }) => ({ q, stats: computeDescriptives(q, submissions, coder) }))
+    .filter(x => x.stats);
+  const codeable = form.questions
+    .filter(q => q.type !== 'section')
+    .map(q => ({ q, coder: getNumericCoder(q) }))
+    .filter(x => x.coder);
+  const crosstabRowSel = document.getElementById('crosstab-row'), crosstabColSel = document.getElementById('crosstab-col');
+  const hasCrosstab = crosstabRowSel && crosstabColSel && crosstabRowSel.value !== crosstabColSel.value;
+  const segQSel = document.getElementById('segment-q'), segValSel = document.getElementById('segment-val');
+  const hasSegment = segQSel && segValSel && segValSel.value;
+
+  if (descRows.length || codeable.length >= 2 || hasCrosstab || hasSegment) {
+    doc.addPage();
+    y = margin;
+    doc.setFont(undefined, 'bold'); doc.setFontSize(16); doc.setTextColor(26,25,22);
+    doc.text('Advanced Analysis', margin, y);
+    y += 26;
+  }
+
+  // Descriptives table (text — precise numbers matter more here than visuals)
+  if (descRows.length) {
+    ensureSpace(40);
+    doc.setFont(undefined, 'bold'); doc.setFontSize(12.5);
+    doc.text('Descriptive Statistics', margin, y);
+    y += 18;
+    doc.setFontSize(9); doc.setFont(undefined, 'normal');
+    const headers = ['Question','N','Mean','Median','Mode','Std Dev','Min','Max'];
+    const widths = [230,26,40,45,40,45,30,30];
+    ensureSpace(16);
+    doc.setFont(undefined,'bold');
+    let cx = margin;
+    headers.forEach((h,i) => { doc.text(h, cx, y); cx += widths[i]; });
+    y += 12;
+    doc.setDrawColor(226,221,212); doc.line(margin, y-9, pageW-margin, y-9);
+    doc.setFont(undefined,'normal');
+    descRows.forEach(({q, stats}) => {
+      const lines = wrapText(q.label, widths[0]-6, 9);
+      ensureSpace(lines.length*11 + 4);
+      let cx = margin;
+      doc.text(lines, cx, y); cx += widths[0];
+      const vals = [String(stats.n), stats.mean.toFixed(2), stats.median.toFixed(2), String(stats.mode), stats.std.toFixed(2), String(stats.min), String(stats.max)];
+      vals.forEach((v,i) => { doc.text(v, cx, y); cx += widths[i+1]; });
+      y += Math.max(lines.length*11, 11) + 3;
+    });
+    y += 14;
+  }
+
+  // Correlation matrix — captured as an image so the colour heatmap survives
+  if (codeable.length >= 2) {
+    const corrContent = document.getElementById('adv-corr-content');
+    if (corrContent && typeof html2canvas !== 'undefined') {
+      try {
+        const canvas = await html2canvas(corrContent, { backgroundColor: '#ffffff', scale: 2 });
+        const imgW = pageW - 2*margin;
+        const imgH = canvas.height * (imgW / canvas.width);
+        ensureSpace(30);
+        doc.setFont(undefined, 'bold'); doc.setFontSize(12.5); doc.setTextColor(26,25,22);
+        doc.text('Correlation Matrix', margin, y);
+        y += 16;
+        ensureSpace(imgH);
+        doc.addImage(canvas.toDataURL('image/png'), 'PNG', margin, y, imgW, imgH);
+        y += imgH + 16;
+      } catch(e) { /* skip image if capture fails — text tables above still cover the data */ }
+    }
+  }
+
+  // Crosstab — whatever is currently selected on-screen
+  if (hasCrosstab) {
+    const qRow = form.questions.find(q => q.id === crosstabRowSel.value);
+    const qCol = form.questions.find(q => q.id === crosstabColSel.value);
+    const { rowOpts, colOpts, table } = computeCrosstab(qRow, qCol, submissions);
+    ensureSpace(40);
+    doc.setFont(undefined, 'bold'); doc.setFontSize(12.5); doc.setTextColor(26,25,22);
+    doc.text(`Crosstab: ${qRow.label} × ${qCol.label}`, margin, y);
+    y += 18;
+    doc.setFontSize(9);
+    const rowLabelW = 130, colW = Math.min(70, (pageW - 2*margin - rowLabelW) / (colOpts.length+1));
+    ensureSpace(14);
+    doc.setFont(undefined, 'bold');
+    let cx = margin + rowLabelW;
+    doc.text('', margin, y);
+    colOpts.forEach(c => { doc.text(wrapText(c, colW-4, 8), cx, y); cx += colW; });
+    doc.text('Total', cx, y);
+    y += 12;
+    doc.setDrawColor(226,221,212); doc.line(margin, y-9, pageW-margin, y-9);
+    doc.setFont(undefined, 'normal');
+    rowOpts.forEach((r, ri) => {
+      ensureSpace(12);
+      let cx = margin + rowLabelW;
+      doc.text(wrapText(r, rowLabelW-6, 9), margin, y);
+      table[ri].forEach(v => { doc.text(String(v), cx, y); cx += colW; });
+      doc.text(String(table[ri].reduce((a,b)=>a+b,0)), cx, y);
+      y += 13;
+    });
+    y += 14;
+  }
+
+  // Segment breakdown — whatever is currently selected on-screen
+  if (hasSegment) {
+    const q = form.questions.find(qq => qq.id === segQSel.value);
+    const val = segValSel.value;
+    const segment = submissions.filter(s => { const v = s.answers?.[q.id]; return Array.isArray(v) ? v.includes(val) : v === val; });
+    ensureSpace(40);
+    doc.setFont(undefined, 'bold'); doc.setFontSize(12.5); doc.setTextColor(26,25,22);
+    doc.text(`Segment: ${q.label} = ${val}`, margin, y);
+    y += 16;
+    doc.setFont(undefined, 'normal'); doc.setFontSize(9.5); doc.setTextColor(107,103,96);
+    doc.text(`${segment.length} of ${submissions.length} responses (${Math.round(segment.length/submissions.length*100)}%)`, margin, y);
+    doc.setTextColor(26,25,22);
+    y += 16;
+    const otherQs = form.questions.filter(qq => qq.type !== 'section' && qq.id !== q.id && (isCategorical(qq) || qq.type === 'checkbox'));
+    otherQs.forEach(oq => {
+      const tally = {};
+      segment.forEach(s => {
+        const v = s.answers?.[oq.id];
+        const vals = Array.isArray(v) ? v : (v ? [v] : []);
+        vals.forEach(vv => { if (vv) tally[vv] = (tally[vv]||0)+1; });
+      });
+      const entries = Object.entries(tally).sort((a,b)=>b[1]-a[1]);
+      if (!entries.length) return;
+      ensureSpace(14 + entries.length*11);
+      doc.setFont(undefined, 'bold'); doc.setFontSize(10);
+      doc.text(oq.label, margin, y);
+      y += 13;
+      doc.setFont(undefined, 'normal'); doc.setFontSize(9);
+      entries.forEach(([k,c]) => {
+        const lines = wrapText(`${k} — ${c}`, pageW - 2*margin - 10, 9);
+        doc.text(lines, margin + 10, y);
+        y += lines.length * 11;
+      });
+      y += 6;
+    });
+  }
 
   doc.save((form.title||'analytics').replace(/[^a-z0-9]/gi,'_') + '_analytics.pdf');
 }
