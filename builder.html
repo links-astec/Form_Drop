@@ -541,6 +541,44 @@ header {
 .cover-preview-mini .cpm-title { font-size: 18px; font-weight: 700; line-height: 1.2; margin-bottom: 4px; word-break: break-word; }
 .cover-preview-mini .cpm-sub { font-size: 13px; opacity: 0.8; margin-bottom: 4px; word-break: break-word; }
 .cover-preview-mini .cpm-date { font-size: 11px; opacity: 0.6; }
+.cover-preview-mini .cpm-desc { font-size: 12px; opacity: 0.85; margin-top: 10px; line-height: 1.5; word-break: break-word; }
+.cover-preview-mini .cpm-desc:empty { display: none; }
+.cover-preview-mini .cpm-desc ul, .cover-preview-mini .cpm-desc ol { margin-left: 18px; text-align: left; }
+
+/* ── Cover field row (input + size picker) ──────────────────── */
+.cover-field-row { display: flex; gap: 8px; align-items: center; }
+.cover-field-row .cover-input { flex: 1; }
+.cover-size-select {
+  font-family: 'DM Sans', sans-serif; font-size: 13px; padding: 9px 8px;
+  border: 1.5px solid var(--border); border-radius: 8px;
+  background: var(--surface2); color: var(--text); outline: none; cursor: pointer;
+}
+
+/* ── Alignment buttons ───────────────────────────────────────── */
+.align-btn-group { display: flex; gap: 6px; }
+.align-btn {
+  flex: 1; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500;
+  padding: 8px 0; border: 1.5px solid var(--border); border-radius: 8px;
+  background: var(--surface2); color: var(--text2); cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.align-btn:hover { border-color: var(--accent); }
+.align-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+/* ── Rich-text toolbar for the cover description ────────────── */
+.rte-toolbar { display: flex; align-items: center; gap: 4px; margin-bottom: 6px; }
+.rte-btn {
+  min-width: 32px; height: 32px; padding: 0 9px; border: 1.5px solid var(--border);
+  border-radius: 6px; background: var(--surface2); color: var(--text); font-size: 13px;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s, border-color 0.15s;
+}
+.rte-btn:hover { background: var(--border); border-color: var(--border2); }
+.rte-sep { width: 1px; height: 20px; background: var(--border); margin: 0 4px; }
+.rte-editable { min-height: 70px; cursor: text; line-height: 1.5; }
+.rte-editable:empty:before { content: attr(data-placeholder); color: var(--text3); }
+.rte-editable ul, .rte-editable ol { margin-left: 20px; }
+.rte-editable:focus { border-color: var(--accent); }
 
 /* ── AI PANEL ─────────────────────────────────────────────── */
 .ai-panel {
@@ -1046,6 +1084,11 @@ header {
   .cover-logo-btn { min-height: 44px; width: 100%; text-align: center; border-radius: 10px; }
   .cover-logo-wrap { flex-direction: column; align-items: flex-start; gap: 8px; }
   .cover-logo-preview { width: 100%; height: 80px; }
+  .cover-field-row { flex-direction: column; align-items: stretch; }
+  .cover-size-select { font-size: 16px; padding: 10px; min-height: 44px; width: 100%; }
+  .align-btn { min-height: 44px; font-size: 13.5px; }
+  .rte-toolbar { flex-wrap: wrap; }
+  .rte-btn { min-height: 38px; }
 
   /* ── Section cards on mobile ── */
   .q-card.section-card { padding: 0.9rem 1rem; }
@@ -1228,19 +1271,50 @@ header {
         </div>
         <div class="cover-field">
           <label>Headline</label>
-          <input class="cover-input" id="cover-headline" type="text" placeholder="e.g. Customer Satisfaction Survey" oninput="updateCoverPreview()"/>
+          <div class="cover-field-row">
+            <input class="cover-input" id="cover-headline" type="text" placeholder="e.g. Customer Satisfaction Survey" oninput="updateCoverPreview()"/>
+            <select class="cover-size-select" id="cover-headline-size" onchange="updateCoverPreview()" title="Headline size">
+              <option value="24">Small</option>
+              <option value="32" selected>Medium</option>
+              <option value="40">Large</option>
+              <option value="48">X-Large</option>
+            </select>
+          </div>
         </div>
         <div class="cover-field">
           <label>Subtitle</label>
-          <input class="cover-input" id="cover-subtitle" type="text" placeholder="e.g. Q1 2025 · Acme Corp" oninput="updateCoverPreview()"/>
+          <div class="cover-field-row">
+            <input class="cover-input" id="cover-subtitle" type="text" placeholder="e.g. Q1 2025 · Acme Corp" oninput="updateCoverPreview()"/>
+            <select class="cover-size-select" id="cover-subtitle-size" onchange="updateCoverPreview()" title="Subtitle size">
+              <option value="12">Small</option>
+              <option value="16" selected>Medium</option>
+              <option value="20">Large</option>
+            </select>
+          </div>
         </div>
         <div class="cover-field">
           <label>Date</label>
           <input class="cover-input" id="cover-date" type="text" placeholder="e.g. May 2025" oninput="updateCoverPreview()"/>
         </div>
         <div class="cover-field">
+          <label>Alignment</label>
+          <div class="align-btn-group" id="cover-align-group">
+            <button type="button" class="align-btn" data-align="left" onclick="setCoverAlign('left')">Left</button>
+            <button type="button" class="align-btn active" data-align="center" onclick="setCoverAlign('center')">Center</button>
+            <button type="button" class="align-btn" data-align="right" onclick="setCoverAlign('right')">Right</button>
+          </div>
+        </div>
+        <div class="cover-field">
           <label>Description / Instructions</label>
-          <textarea class="cover-input cover-textarea" id="cover-desc" placeholder="Any instructions or context for respondents…" oninput="updateCoverPreview()"></textarea>
+          <div class="rte-toolbar">
+            <button type="button" class="rte-btn" onmousedown="event.preventDefault()" onclick="rteCmd('bold')" title="Bold"><b>B</b></button>
+            <button type="button" class="rte-btn" onmousedown="event.preventDefault()" onclick="rteCmd('italic')" title="Italic"><i>I</i></button>
+            <button type="button" class="rte-btn" onmousedown="event.preventDefault()" onclick="rteCmd('underline')" title="Underline"><u>U</u></button>
+            <span class="rte-sep"></span>
+            <button type="button" class="rte-btn" onmousedown="event.preventDefault()" onclick="rteCmd('insertUnorderedList')" title="Bullet list">•List</button>
+            <button type="button" class="rte-btn" onmousedown="event.preventDefault()" onclick="rteCmd('insertOrderedList')" title="Numbered list">1. List</button>
+          </div>
+          <div class="cover-input cover-textarea rte-editable" id="cover-desc" contenteditable="true" data-placeholder="Any instructions or context for respondents…" oninput="updateCoverPreview()"></div>
         </div>
         <!-- Live mini preview -->
         <div class="cover-preview-mini" id="cover-preview-mini">
@@ -1248,6 +1322,7 @@ header {
           <div class="cpm-title" id="cpm-title"></div>
           <div class="cpm-sub" id="cpm-sub"></div>
           <div class="cpm-date" id="cpm-date"></div>
+          <div class="cpm-desc" id="cpm-desc"></div>
         </div>
       </div>
     </div>
@@ -1785,9 +1860,12 @@ function getCoverData() {
     headline: document.getElementById('cover-headline')?.value.trim() || '',
     subtitle: document.getElementById('cover-subtitle')?.value.trim() || '',
     date: document.getElementById('cover-date')?.value.trim() || '',
-    desc: document.getElementById('cover-desc')?.value.trim() || '',
+    desc: sanitizeRichText(document.getElementById('cover-desc')?.innerHTML || ''),
     logo: document.getElementById('cover-logo-preview')?.src || '',
     hasLogo: document.getElementById('cover-logo-preview')?.classList.contains('show') || false,
+    align: coverAlign,
+    headlineSize: parseInt(document.getElementById('cover-headline-size')?.value, 10) || 32,
+    subtitleSize: parseInt(document.getElementById('cover-subtitle-size')?.value, 10) || 16,
   };
 }
 
@@ -1798,13 +1876,17 @@ function buildCoverHTML(cover, formTitle, formDesc) {
   const logoHtml = cover.hasLogo && cover.logo
     ? `<img class="print-cover-logo" src="${cover.logo}" alt="Logo"/>`
     : '';
-  return `<div class="print-cover">
+  const align = cover.align || 'center';
+  const alignItems = align === 'left' ? 'flex-start' : align === 'right' ? 'flex-end' : 'center';
+  // desc is already sanitized to a small formatting whitelist before it's ever
+  // stored (see sanitizeRichText) — safe to inline as-is here.
+  return `<div class="print-cover" style="text-align:${align};align-items:${alignItems}">
     ${logoHtml}
     <div class="print-cover-line"></div>
-    <div class="print-cover-title">${esc(headline)}</div>
-    ${cover.subtitle ? `<div class="print-cover-subtitle">${esc(cover.subtitle)}</div>` : ''}
+    <div class="print-cover-title" style="font-size:${cover.headlineSize || 32}pt">${esc(headline)}</div>
+    ${cover.subtitle ? `<div class="print-cover-subtitle" style="font-size:${cover.subtitleSize || 16}pt">${esc(cover.subtitle)}</div>` : ''}
     ${cover.date ? `<div class="print-cover-date">${esc(cover.date)}</div>` : ''}
-    ${cover.desc ? `<div class="print-cover-desc">${esc(cover.desc)}</div>` : ''}
+    ${cover.desc ? `<div class="print-cover-desc">${cover.desc}</div>` : ''}
   </div>`;
 }
 
@@ -1903,10 +1985,47 @@ function printForm() {
    COVER PAGE EDITOR
    ============================================================ */
 let coverOpen = false;
+let coverAlign = 'center';
+
 function toggleCoverEditor() {
   coverOpen = !coverOpen;
   document.getElementById('cover-editor-body').classList.toggle('hidden', !coverOpen);
   document.getElementById('cover-toggle-label').textContent = coverOpen ? '− Hide' : '+ Add cover';
+}
+
+function setCoverAlign(align) {
+  coverAlign = align;
+  document.querySelectorAll('#cover-align-group .align-btn').forEach(b => b.classList.toggle('active', b.dataset.align === align));
+  updateCoverPreview();
+}
+
+function rteCmd(cmd) {
+  document.getElementById('cover-desc').focus();
+  document.execCommand(cmd, false, null);
+  updateCoverPreview();
+}
+
+// Whitelists a small set of formatting tags (bold/italic/underline/lists) and
+// strips everything else — attributes included — before the cover description
+// is stored or rendered. The editor only ever produces these tags itself, but
+// this also protects against pasted-in HTML from other sources.
+function sanitizeRichText(html) {
+  const allowed = new Set(['B', 'STRONG', 'I', 'EM', 'U', 'UL', 'OL', 'LI', 'BR', 'DIV', 'SPAN', 'P']);
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html || '';
+  (function clean(node) {
+    Array.from(node.childNodes).forEach(child => {
+      if (child.nodeType !== 1) return;
+      if (!allowed.has(child.tagName)) {
+        while (child.firstChild) node.insertBefore(child.firstChild, child);
+        node.removeChild(child);
+        return;
+      }
+      Array.from(child.attributes).forEach(a => child.removeAttribute(a.name));
+      clean(child);
+    });
+  })(tmp);
+  return tmp.innerHTML.trim();
 }
 
 function handleLogoUpload(input) {
@@ -1940,12 +2059,22 @@ function updateCoverPreview() {
   const headline = document.getElementById('cover-headline').value.trim();
   const subtitle = document.getElementById('cover-subtitle').value.trim();
   const date = document.getElementById('cover-date').value.trim();
-  const hasContent = headline || subtitle || date;
+  const descEl = document.getElementById('cover-desc');
+  const descHtml = sanitizeRichText(descEl.innerHTML);
+  const hasContent = headline || subtitle || date || descHtml;
   if (hasContent) {
     mini.classList.add('show');
-    document.getElementById('cpm-title').textContent = headline || document.getElementById('form-title').value || 'My Form';
-    document.getElementById('cpm-sub').textContent = subtitle;
+    mini.style.textAlign = coverAlign;
+    const titleEl = document.getElementById('cpm-title');
+    titleEl.textContent = headline || document.getElementById('form-title').value || 'My Form';
+    const headlineSize = parseInt(document.getElementById('cover-headline-size').value, 10) || 32;
+    titleEl.style.fontSize = Math.round(headlineSize * 0.6) + 'px';
+    const subEl = document.getElementById('cpm-sub');
+    subEl.textContent = subtitle;
+    const subtitleSize = parseInt(document.getElementById('cover-subtitle-size').value, 10) || 16;
+    subEl.style.fontSize = Math.round(subtitleSize * 0.85) + 'px';
     document.getElementById('cpm-date').textContent = date;
+    document.getElementById('cpm-desc').innerHTML = descHtml;
   } else {
     mini.classList.remove('show');
   }
@@ -2005,7 +2134,12 @@ function applyCoverData(cover) {
   document.getElementById('cover-headline').value = cover.headline || '';
   document.getElementById('cover-subtitle').value = cover.subtitle || '';
   document.getElementById('cover-date').value = cover.date || '';
-  document.getElementById('cover-desc').value = cover.desc || '';
+  document.getElementById('cover-desc').innerHTML = sanitizeRichText(cover.desc || '');
+
+  coverAlign = cover.align || 'center';
+  document.querySelectorAll('#cover-align-group .align-btn').forEach(b => b.classList.toggle('active', b.dataset.align === coverAlign));
+  document.getElementById('cover-headline-size').value = String(cover.headlineSize || 32);
+  document.getElementById('cover-subtitle-size').value = String(cover.subtitleSize || 16);
 
   const logoImg = document.getElementById('cover-logo-preview');
   const removeLogoBtn = document.getElementById('remove-logo-btn');
@@ -2396,7 +2530,7 @@ function applyAIChanges(changes) {
     if (c.headline !== undefined) document.getElementById('cover-headline').value = c.headline;
     if (c.subtitle !== undefined) document.getElementById('cover-subtitle').value = c.subtitle;
     if (c.date !== undefined) document.getElementById('cover-date').value = c.date;
-    if (c.desc !== undefined) document.getElementById('cover-desc').value = c.desc;
+    if (c.desc !== undefined) document.getElementById('cover-desc').innerHTML = esc(c.desc).replace(/\n/g, '<br>');
     updateCoverPreview();
   }
   if (changes.replaceAllQuestions) {
