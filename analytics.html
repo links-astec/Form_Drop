@@ -83,6 +83,12 @@ header{
 .qa-title{font-size:14.5px;font-weight:500;margin-bottom:4px;line-height:1.4}
 .qa-meta{font-size:12px;color:var(--text3);margin-bottom:1.25rem}
 .chart-wrap{display:flex;align-items:center;gap:1.5rem;flex-wrap:wrap}
+.qa-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:4px}
+.qa-card-actions{flex-shrink:0}
+.chart-type-group{display:flex;gap:2px;background:var(--surface2);border-radius:8px;padding:2px}
+.chart-type-btn{width:26px;height:26px;border:none;background:transparent;border-radius:6px;color:var(--text3);font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s,color .15s}
+.chart-type-btn:hover{color:var(--text2)}
+.chart-type-btn.active{background:var(--accent);color:#fff}
 .legend{flex:1;min-width:140px;display:flex;flex-direction:column;gap:7px}
 .legend-item{display:flex;align-items:center;gap:8px;font-size:13px}
 .legend-dot{width:11px;height:11px;border-radius:50%;flex-shrink:0}
@@ -120,6 +126,14 @@ header{
 .adv-empty{color:var(--text3);font-size:13px;padding:2rem 1rem;text-align:center}
 .adv-hint{font-size:12.5px;color:var(--text2);margin-bottom:14px;line-height:1.6}
 .adv-export-row{display:flex;justify-content:flex-end;margin-bottom:10px}
+.stat-btn-group{display:flex;gap:6px}
+.stat-btn{font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;padding:7px 16px;border-radius:8px;border:1.5px solid var(--border2);background:var(--surface);color:var(--text2);cursor:pointer;transition:background .15s,color .15s,border-color .15s}
+.stat-btn:hover{border-color:var(--accent)}
+.stat-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.chart-tall-wrap{position:relative;min-height:220px}
+.sig-badge{display:inline-flex;align-items:center;font-size:12px;font-weight:600;padding:3px 10px;border-radius:30px;margin-left:8px}
+.sig-badge.sig{background:var(--accent-light);color:var(--accent-text)}
+.sig-badge.notsig{background:var(--surface2);color:var(--text3)}
 
 /* ── STATES ──────────────────────────────────────────────── */
 .empty-state{text-align:center;padding:4rem 1.5rem;color:var(--text2)}
@@ -179,6 +193,11 @@ header{
   .q-analytics-card{padding:1.1rem;border-radius:var(--radius-lg)}
   .qa-title{font-size:14px}
   .chart-wrap{flex-direction:row;gap:1rem;align-items:center}
+  .qa-card-head{flex-wrap:wrap}
+  .chart-type-btn{width:30px;height:30px;font-size:14px}
+  .stat-btn-group{width:100%}
+  .stat-btn{padding:8px 0;font-size:12.5px}
+  .sig-badge{display:block;margin:6px 0 0;width:fit-content}
 
   /* Text answers */
   .text-answers{max-height:160px}
@@ -441,11 +460,13 @@ function renderAnalytics(data) {
         <button class="adv-tab-btn" data-adv="crosstab" onclick="switchAdvTab('crosstab')">Crosstab</button>
         <button class="adv-tab-btn" data-adv="corr" onclick="switchAdvTab('corr')">Correlation</button>
         <button class="adv-tab-btn" data-adv="segment" onclick="switchAdvTab('segment')">Segment</button>
+        <button class="adv-tab-btn" data-adv="compare" onclick="switchAdvTab('compare')">Compare Groups</button>
       </div>
       <div class="adv-panel active" id="adv-desc"></div>
       <div class="adv-panel" id="adv-crosstab"></div>
       <div class="adv-panel" id="adv-corr"></div>
       <div class="adv-panel" id="adv-segment"></div>
+      <div class="adv-panel" id="adv-compare"></div>
     </div>
     <div class="table-section">
       <div class="section-title">All responses</div>
@@ -499,56 +520,38 @@ function renderTimeline(submissions) {
 }
 
 /* ── Per-question charts ───────────────────────────────────────────────────── */
+let chartTypePref = {}; // question id -> 'doughnut' | 'pie' | 'bar', remembered per session
+
 function renderCharts(form, submissions, answered) {
   const grid = document.getElementById('q-grid');
   form.questions.forEach((q, qi) => {
     const div = document.createElement('div');
     div.className = 'q-analytics-card';
+    div.id = 'qcard-' + q.id;
     const typeLabel = {short:'Short answer',long:'Paragraph',radio:'Multiple choice',checkbox:'Checkboxes',dropdown:'Dropdown',email:'Email',number:'Number',date:'Date'}[q.type] || q.type;
     const ans = answered(q);
-    div.innerHTML = `<div class="qa-title">${esc(q.label||`Question ${qi+1}`)}</div>
-      <div class="qa-meta">${typeLabel} · ${ans}/${submissions.length} answered</div>
-      <div id="chart-area-${q.id}"></div>`;
+    const isChoice = ['radio','checkbox','dropdown'].includes(q.type);
+    div.innerHTML = `<div class="qa-card-head">
+        <div>
+          <div class="qa-title">${esc(q.label||`Question ${qi+1}`)}</div>
+          <div class="qa-meta">${typeLabel} · ${ans}/${submissions.length} answered</div>
+        </div>
+        ${isChoice ? `<div class="qa-card-actions">
+          <div class="chart-type-group" id="ctype-${q.id}">
+            <button class="chart-type-btn" data-type="doughnut" onclick="setQuestionChartType('${q.id}','doughnut')" title="Donut chart">◔</button>
+            <button class="chart-type-btn" data-type="pie" onclick="setQuestionChartType('${q.id}','pie')" title="Pie chart">◕</button>
+            <button class="chart-type-btn" data-type="bar" onclick="setQuestionChartType('${q.id}','bar')" title="Bar chart">▮</button>
+          </div>
+        </div>` : ''}
+      </div>
+      <div id="chart-area-${q.id}"></div>
+      ${isChoice ? `<div class="adv-export-row" style="margin-top:10px"><button class="btn" onclick="saveElementAsImage('qcard-${q.id}', 'question_${qi+1}')">📷 Save as image</button></div>` : ''}`;
     grid.appendChild(div);
 
-    const area = document.getElementById('chart-area-' + q.id);
-
-    if (['radio','checkbox','dropdown'].includes(q.type)) {
-      const tally = {};
-      submissions.forEach(s => {
-        const v = s.answers?.[q.id];
-        const vals = Array.isArray(v) ? v : (v ? [v] : []);
-        vals.forEach(val => { if(val) tally[val] = (tally[val]||0)+1; });
-      });
-      const labels = Object.keys(tally);
-      const values = Object.values(tally);
-      const total = values.reduce((a,b)=>a+b,0)||1;
-      if (!labels.length) { area.innerHTML = `<div class="no-answers">No answers yet.</div>`; return; }
-
-      const canvasId = 'cv-' + q.id;
-      area.innerHTML = `<div class="chart-wrap">
-        <canvas id="${canvasId}" width="150" height="150" style="flex-shrink:0"></canvas>
-        <div class="legend" id="leg-${q.id}"></div>
-      </div>`;
-      const ctx = document.getElementById(canvasId).getContext('2d');
-      const chart = new Chart(ctx, {
-        type: 'doughnut',
-        data: { labels, datasets: [{ data: values, backgroundColor: COLORS.slice(0,labels.length), borderWidth: 2, borderColor: '#fff' }]},
-        options: { responsive: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => `${c.label}: ${c.parsed} (${Math.round(c.parsed/total*100)}%)` }}}, cutout: '62%' }
-      });
-      chartInstances.push(chart);
-
-      const leg = document.getElementById('leg-' + q.id);
-      labels.forEach((lbl, i) => {
-        const pct = Math.round(values[i]/total*100);
-        const item = document.createElement('div');
-        item.className = 'legend-item';
-        item.innerHTML = `<div class="legend-dot" style="background:${COLORS[i%COLORS.length]}"></div>
-          <span class="legend-label">${esc(lbl)}</span>
-          <span class="legend-pct">${pct}%</span>`;
-        leg.appendChild(item);
-      });
+    if (isChoice) {
+      renderChoiceChart(q, submissions, questionChartType(q.id));
     } else {
+      const area = document.getElementById('chart-area-' + q.id);
       const answers = submissions.map(s => {
         const v = s.answers?.[q.id];
         return Array.isArray(v) ? v.join(', ') : (v||'');
@@ -557,6 +560,78 @@ function renderCharts(form, submissions, answered) {
       area.innerHTML = `<div class="text-answers">${answers.slice().reverse().map(a => `<div class="text-answer">${esc(a)}</div>`).join('')}</div>`;
     }
   });
+}
+
+function questionChartType(qid) { return chartTypePref[qid] || 'doughnut'; }
+
+function setQuestionChartType(qid, type) {
+  chartTypePref[qid] = type;
+  const q = currentData.form.questions.find(qq => qq.id === qid);
+  if (q) renderChoiceChart(q, currentData.submissions, type);
+}
+
+// Renders (or re-renders) the chart for one multiple-choice/checkbox/dropdown
+// question into its existing #chart-area-<id> — used both on initial load and
+// whenever the Donut/Pie/Bar toggle is clicked, so switching type never needs a
+// full page re-render.
+function renderChoiceChart(q, submissions, type) {
+  const area = document.getElementById('chart-area-' + q.id);
+  const toggle = document.getElementById('ctype-' + q.id);
+  if (toggle) toggle.querySelectorAll('.chart-type-btn').forEach(b => b.classList.toggle('active', b.dataset.type === type));
+
+  const tally = {};
+  submissions.forEach(s => {
+    const v = s.answers?.[q.id];
+    const vals = Array.isArray(v) ? v : (v ? [v] : []);
+    vals.forEach(val => { if (val) tally[val] = (tally[val]||0)+1; });
+  });
+  const labels = Object.keys(tally);
+  const values = Object.values(tally);
+  const total = values.reduce((a,b)=>a+b,0) || 1;
+  if (!labels.length) { area.innerHTML = `<div class="no-answers">No answers yet.</div>`; return; }
+
+  const existing = chartInstances.find(c => c.canvas && c.canvas.id === 'cv-' + q.id);
+  if (existing) { try { existing.destroy(); } catch(e){} chartInstances = chartInstances.filter(c => c !== existing); }
+
+  const canvasId = 'cv-' + q.id;
+  if (type === 'bar') {
+    area.innerHTML = `<canvas id="${canvasId}" height="${Math.max(140, labels.length*34)}"></canvas>`;
+    const ctx = document.getElementById(canvasId).getContext('2d');
+    const chart = new Chart(ctx, {
+      type: 'bar',
+      data: { labels, datasets: [{ data: values, backgroundColor: COLORS.slice(0,labels.length), borderRadius: 4, maxBarThickness: 28 }]},
+      options: {
+        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => `${c.parsed.x} (${Math.round(c.parsed.x/total*100)}%)` }}},
+        scales: { x: { beginAtZero: true, ticks: { precision: 0, font: { size: 11 }, color: '#a8a49e' }, grid: { color: '#f0ede6' }},
+                  y: { ticks: { font: { size: 11.5 }, color: '#1a1916' }, grid: { display: false }}}
+      }
+    });
+    chartInstances.push(chart);
+  } else {
+    area.innerHTML = `<div class="chart-wrap">
+      <canvas id="${canvasId}" width="150" height="150" style="flex-shrink:0"></canvas>
+      <div class="legend" id="leg-${q.id}"></div>
+    </div>`;
+    const ctx = document.getElementById(canvasId).getContext('2d');
+    const chart = new Chart(ctx, {
+      type: 'pie',
+      data: { labels, datasets: [{ data: values, backgroundColor: COLORS.slice(0,labels.length), borderWidth: 2, borderColor: '#fff' }]},
+      options: { responsive: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => `${c.label}: ${c.parsed} (${Math.round(c.parsed/total*100)}%)` }}}, cutout: type === 'pie' ? '0%' : '62%' }
+    });
+    chartInstances.push(chart);
+
+    const leg = document.getElementById('leg-' + q.id);
+    labels.forEach((lbl, i) => {
+      const pct = Math.round(values[i]/total*100);
+      const item = document.createElement('div');
+      item.className = 'legend-item';
+      item.innerHTML = `<div class="legend-dot" style="background:${COLORS[i%COLORS.length]}"></div>
+        <span class="legend-label">${esc(lbl)}</span>
+        <span class="legend-pct">${pct}%</span>`;
+      leg.appendChild(item);
+    });
+  }
 }
 
 /* ── All responses table ───────────────────────────────────────────────────── */
@@ -636,6 +711,9 @@ function computeDescriptives(q, submissions, coder) {
   return { n, mean, median, mode: Number(mode), std: Math.sqrt(variance), min: sorted[0], max: sorted[n - 1] };
 }
 
+let descChartStat = 'mean';
+let descChartRows = [];
+
 function renderDescriptives(form, submissions) {
   const el = document.getElementById('adv-desc');
   const rows = form.questions
@@ -644,6 +722,7 @@ function renderDescriptives(form, submissions) {
     .filter(x => x.coder)
     .map(({ q, coder }) => ({ q, stats: computeDescriptives(q, submissions, coder) }))
     .filter(x => x.stats);
+  descChartRows = rows;
 
   if (!rows.length) {
     el.innerHTML = `<div class="adv-empty">No Likert-scale, agree/disagree, or number questions found. This works automatically for radio/dropdown questions whose options are a recognized scale (e.g. Strongly Disagree…Strongly Agree, Poor…Excellent, Never…Always, Yes/Not sure/No) and for Number-type questions.</div>`;
@@ -668,10 +747,137 @@ function renderDescriptives(form, submissions) {
           </tr>`).join('')}
         </tbody>
       </table></div>
+    </div>
+
+    <div class="section-title" style="margin-top:24px;font-size:14px">Likert Comparison Chart</div>
+    <p class="adv-hint">Pick which statistic to compare across every scale question — mean, median, or mode.</p>
+    <div class="adv-controls" style="margin-bottom:6px">
+      <div class="stat-btn-group" id="desc-stat-group">
+        <button class="stat-btn active" data-stat="mean" onclick="setDescChartStat('mean')">Mean</button>
+        <button class="stat-btn" data-stat="median" onclick="setDescChartStat('median')">Median</button>
+        <button class="stat-btn" data-stat="mode" onclick="setDescChartStat('mode')">Mode</button>
+      </div>
+    </div>
+    <div class="adv-export-row"><button class="btn" onclick="saveElementAsImage('adv-desc-chart-content', 'likert_comparison', this)">📷 Save as image</button></div>
+    <div id="adv-desc-chart-content">
+      <div class="chart-tall-wrap"><canvas id="cv-desc-chart"></canvas></div>
     </div>`;
+
+  renderDescChart(rows, descChartStat);
+}
+
+function setDescChartStat(stat) {
+  descChartStat = stat;
+  document.querySelectorAll('#desc-stat-group .stat-btn').forEach(b => b.classList.toggle('active', b.dataset.stat === stat));
+  renderDescChart(descChartRows, stat);
+}
+
+function renderDescChart(rows, stat) {
+  const canvas = document.getElementById('cv-desc-chart');
+  if (!canvas || !rows.length) return;
+  const existing = chartInstances.find(c => c.canvas && c.canvas.id === 'cv-desc-chart');
+  if (existing) { try { existing.destroy(); } catch(e){} chartInstances = chartInstances.filter(c => c !== existing); }
+
+  canvas.height = Math.max(220, rows.length * 32);
+  const labels = rows.map((r, i) => `Q${i+1}`);
+  const values = rows.map(r => r.stats[stat]);
+  const statLabel = stat.charAt(0).toUpperCase() + stat.slice(1);
+  const ctx = canvas.getContext('2d');
+  const chart = new Chart(ctx, {
+    type: 'bar',
+    data: { labels, datasets: [{ label: statLabel, data: values, backgroundColor: '#2a5c45', borderRadius: 4, maxBarThickness: 22 }]},
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: {
+        title: t => rows[t[0].dataIndex].q.label,
+        label: c => `${statLabel}: ${c.parsed.x.toFixed(2)}`
+      }}},
+      scales: {
+        x: { beginAtZero: true, ticks: { font: { size: 11 }, color: '#a8a49e' }, grid: { color: '#f0ede6' }},
+        y: { ticks: { font: { size: 11 }, color: '#1a1916' }, grid: { display: false }},
+      }
+    }
+  });
+  chartInstances.push(chart);
 }
 
 /* ── Crosstab ─────────────────────────────────────────────────────────────── */
+/* ── Chi-square test of independence ─────────────────────────────────────────
+   Standard Numerical-Recipes-style regularized incomplete gamma function to
+   compute the chi-square p-value — verified against textbook critical values
+   (e.g. df=1,chiSq=3.841→p≈0.05; df=1,chiSq=6.635→p≈0.01) and a worked 2×2
+   example (chiSq=16.667,df=1→p≈4.46e-5) before shipping. */
+function logGamma(x) {
+  const g = 7;
+  const p = [0.99999999999980993, 676.5203681218851, -1259.1392167224028, 771.32342877765313, -176.61502916214059, 12.507343278686905, -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7];
+  if (x < 0.5) return Math.log(Math.PI / Math.sin(Math.PI * x)) - logGamma(1 - x);
+  x -= 1;
+  let a = p[0];
+  const t = x + g + 0.5;
+  for (let i = 1; i < g + 2; i++) a += p[i] / (x + i);
+  return 0.5 * Math.log(2 * Math.PI) + (x + 0.5) * Math.log(t) - t + Math.log(a);
+}
+function lowerIncompleteGammaSeries(a, x) {
+  if (x <= 0) return 0;
+  let sum = 1 / a, term = sum, n = a;
+  for (let i = 1; i < 300; i++) { n += 1; term *= x / n; sum += term; if (Math.abs(term) < Math.abs(sum) * 1e-15) break; }
+  return sum * Math.exp(-x + a * Math.log(x) - logGamma(a));
+}
+function upperIncompleteGammaCF(a, x) {
+  const FPMIN = 1e-300;
+  let b = x + 1 - a, c = 1 / FPMIN, d = 1 / b, h = d;
+  for (let i = 1; i < 300; i++) {
+    const an = -i * (i - a);
+    b += 2; d = an * d + b; if (Math.abs(d) < FPMIN) d = FPMIN;
+    c = b + an / c; if (Math.abs(c) < FPMIN) c = FPMIN;
+    d = 1 / d; const del = d * c; h *= del;
+    if (Math.abs(del - 1) < 1e-15) break;
+  }
+  return Math.exp(-x + a * Math.log(x) - logGamma(a)) * h;
+}
+function regularizedGammaQ(a, x) {
+  if (x < 0 || a <= 0) return NaN;
+  if (x === 0) return 1;
+  return x < a + 1 ? 1 - lowerIncompleteGammaSeries(a, x) : upperIncompleteGammaCF(a, x);
+}
+function chiSquarePValue(chiSq, df) {
+  if (chiSq <= 0 || df <= 0) return 1;
+  return regularizedGammaQ(df / 2, chiSq / 2);
+}
+
+// Computes chi-square statistic, degrees of freedom, and p-value from an
+// observed contingency table (array of row arrays). Returns null if the table
+// is empty or any expected cell count is 0 (test isn't meaningful then).
+function chiSquareTest(table) {
+  const rows = table.length, cols = table[0] ? table[0].length : 0;
+  if (!rows || !cols) return null;
+  const rowTotals = table.map(r => r.reduce((a, b) => a + b, 0));
+  const colTotals = table[0].map((_, ci) => table.reduce((a, r) => a + r[ci], 0));
+  const grand = rowTotals.reduce((a, b) => a + b, 0);
+  if (!grand) return null;
+  let chiSq = 0, lowExpected = false;
+  for (let i = 0; i < rows; i++) {
+    for (let j = 0; j < cols; j++) {
+      const expected = rowTotals[i] * colTotals[j] / grand;
+      if (expected > 0) chiSq += (table[i][j] - expected) ** 2 / expected;
+      if (expected > 0 && expected < 5) lowExpected = true;
+    }
+  }
+  const df = (rows - 1) * (cols - 1);
+  if (df <= 0) return null;
+  return { chiSq, df, p: chiSquarePValue(chiSq, df), lowExpected, n: grand };
+}
+
+function chiSquareResultHTML(result) {
+  if (!result) return '';
+  const sig = result.p < 0.05;
+  return `<div style="margin-top:14px;font-size:13px;color:var(--text2);line-height:1.7">
+    <strong>Chi-square test of independence:</strong> χ²(${result.df}, N=${result.n}) = ${result.chiSq.toFixed(2)}, p ${result.p < 0.001 ? '&lt; 0.001' : '= ' + result.p.toFixed(3)}
+    <span class="sig-badge ${sig ? 'sig' : 'notsig'}">${sig ? '✓ Statistically significant (p < 0.05)' : 'Not statistically significant (p ≥ 0.05)'}</span>
+    ${result.lowExpected ? '<br><span style="color:var(--text3);font-size:12px">⚠ Some expected cell counts are below 5 — chi-square may be unreliable with this little data; consider grouping categories or collecting more responses.</span>' : ''}
+  </div>`;
+}
+
 function computeCrosstab(qRow, qCol, submissions) {
   const rowOpts = qRow.options || [];
   const colOpts = qCol.options || [];
@@ -728,6 +934,7 @@ function updateCrosstab() {
   const rowTotals = table.map(r => r.reduce((a, b) => a + b, 0));
   const colTotals = colOpts.map((_, ci) => table.reduce((a, r) => a + r[ci], 0));
   const grandTotal = rowTotals.reduce((a, b) => a + b, 0);
+  const chi = chiSquareTest(table);
 
   function cell(ri, ci) {
     const v = table[ri][ci];
@@ -742,7 +949,35 @@ function updateCrosstab() {
       ${rowOpts.map((r, ri) => `<tr><td>${esc(r)}</td>${colOpts.map((c, ci) => `<td>${cell(ri, ci)}</td>`).join('')}<td><strong>${rowTotals[ri]}</strong></td></tr>`).join('')}
       <tr><td><strong>Total</strong></td>${colOpts.map((c, ci) => `<td><strong>${colTotals[ci]}</strong></td>`).join('')}<td><strong>${grandTotal}</strong></td></tr>
     </tbody>
-  </table></div>`;
+  </table></div>
+  ${chiSquareResultHTML(chi)}
+  <div class="chart-tall-wrap" style="margin-top:16px"><canvas id="cv-crosstab-bar"></canvas></div>`;
+
+  const existing = chartInstances.find(c => c.canvas && c.canvas.id === 'cv-crosstab-bar');
+  if (existing) { try { existing.destroy(); } catch(e){} chartInstances = chartInstances.filter(c => c !== existing); }
+  const canvas = document.getElementById('cv-crosstab-bar');
+  canvas.height = Math.max(200, rowOpts.length * 44);
+  const chart = new Chart(canvas.getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: rowOpts,
+      datasets: colOpts.map((c, ci) => ({
+        label: c,
+        data: rowOpts.map((r, ri) => table[ri][ci]),
+        backgroundColor: COLORS[ci % COLORS.length],
+        borderRadius: 3,
+      })),
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom', labels: { boxWidth: 11, font: { size: 11.5 } } } },
+      scales: {
+        x: { ticks: { font: { size: 11.5 }, color: '#1a1916' }, grid: { display: false }},
+        y: { beginAtZero: true, ticks: { precision: 0, font: { size: 11 }, color: '#a8a49e' }, grid: { color: '#f0ede6' }},
+      }
+    }
+  });
+  chartInstances.push(chart);
 }
 
 /* ── Correlation matrix ───────────────────────────────────────────────────── */
@@ -799,6 +1034,153 @@ function renderCorrelationMatrix(form, submissions) {
         </tbody>
       </table></div>
     </div>`;
+}
+
+/* ── Compare Groups ───────────────────────────────────────────────────────────
+   Matches the classic "compare group A vs group B across every question" study
+   design (e.g. lakeside vs inland communities) — grouped bar chart + chi-square
+   significance test for every categorical question, and a mean/median/mode
+   comparison (descriptive only, no significance test) for every Likert/number
+   question. */
+function renderCompareControls(form) {
+  const el = document.getElementById('adv-compare');
+  const catQs = form.questions.filter(isCategorical);
+  if (!catQs.length) {
+    el.innerHTML = `<div class="adv-empty">Need at least one multiple-choice or dropdown question to group by (e.g. community, gender, occupation).</div>`;
+    return;
+  }
+  const qOpts = catQs.map(q => `<option value="${esc(q.id)}">${esc(q.label || '')}</option>`).join('');
+  el.innerHTML = `
+    <p class="adv-hint">Compare two specific groups (e.g. two communities, or male vs female) across every other question — grouped bar charts, with a chi-square significance test for each categorical question.</p>
+    <div class="adv-controls">
+      <div><label class="config-label" style="display:block;margin-bottom:5px;">Group by</label><select class="adv-select" id="compare-q" onchange="updateCompareValueOptions()">${qOpts}</select></div>
+      <div><label class="config-label" style="display:block;margin-bottom:5px;">Group A</label><select class="adv-select" id="compare-a" onchange="updateCompare()"></select></div>
+      <div><label class="config-label" style="display:block;margin-bottom:5px;">Group B</label><select class="adv-select" id="compare-b" onchange="updateCompare()"></select></div>
+    </div>
+    <div id="compare-result"></div>`;
+  updateCompareValueOptions();
+}
+
+function updateCompareValueOptions() {
+  const { form } = currentData;
+  const q = form.questions.find(qq => qq.id === document.getElementById('compare-q').value);
+  const opts = (q.options || []).map(o => `<option value="${esc(o)}">${esc(o)}</option>`).join('');
+  document.getElementById('compare-a').innerHTML = opts;
+  document.getElementById('compare-b').innerHTML = opts;
+  if ((q.options || []).length > 1) document.getElementById('compare-b').selectedIndex = 1;
+  updateCompare();
+}
+
+function updateCompare() {
+  const { form, submissions } = currentData;
+  const qSel = document.getElementById('compare-q'), aSel = document.getElementById('compare-a'), bSel = document.getElementById('compare-b');
+  if (!qSel || !aSel || !bSel) return;
+  const q = form.questions.find(qq => qq.id === qSel.value);
+  const aVal = aSel.value, bVal = bSel.value;
+  const result = document.getElementById('compare-result');
+  if (!q || !aVal || !bVal) { result.innerHTML = ''; return; }
+  if (aVal === bVal) { result.innerHTML = `<div class="adv-empty">Choose two different values for Group A and Group B.</div>`; return; }
+
+  // Drop any compare-tab charts from a previous render before rebuilding
+  chartInstances = chartInstances.filter(c => {
+    if (c.canvas && c.canvas.id && c.canvas.id.startsWith('cv-compare-')) { try { c.destroy(); } catch(e){} return false; }
+    return true;
+  });
+
+  const inGroup = (s, val) => { const v = s.answers?.[q.id]; return Array.isArray(v) ? v.includes(val) : v === val; };
+  const groupA = submissions.filter(s => inGroup(s, aVal));
+  const groupB = submissions.filter(s => inGroup(s, bVal));
+
+  if (!groupA.length || !groupB.length) {
+    result.innerHTML = `<div class="adv-empty">One or both groups have no responses yet (Group A: ${groupA.length}, Group B: ${groupB.length}).</div>`;
+    return;
+  }
+
+  const filenameSafe = (aVal + '_vs_' + bVal).replace(/[^a-z0-9]/gi, '_');
+  result.innerHTML = `
+    <p class="adv-hint"><strong>Group A</strong>: ${esc(aVal)} (${groupA.length} responses) vs <strong>Group B</strong>: ${esc(bVal)} (${groupB.length} responses)</p>
+    <div class="adv-export-row"><button class="btn" onclick="saveElementAsImage('compare-cards', 'compare_${filenameSafe}', this)">📷 Save as image</button></div>
+    <div class="questions-grid" id="compare-cards"></div>`;
+
+  const cardsEl = document.getElementById('compare-cards');
+  const otherQs = form.questions.filter(qq => qq.type !== 'section' && qq.id !== q.id);
+
+  otherQs.forEach(oq => {
+    const coder = getNumericCoder(oq);
+    const card = document.createElement('div');
+    card.className = 'q-analytics-card';
+
+    if (isCategorical(oq) || oq.type === 'checkbox') {
+      const tallyA = {}, tallyB = {};
+      groupA.forEach(s => { const v = s.answers?.[oq.id]; (Array.isArray(v) ? v : (v ? [v] : [])).forEach(vv => { if (vv) tallyA[vv] = (tallyA[vv]||0)+1; }); });
+      groupB.forEach(s => { const v = s.answers?.[oq.id]; (Array.isArray(v) ? v : (v ? [v] : [])).forEach(vv => { if (vv) tallyB[vv] = (tallyB[vv]||0)+1; }); });
+      const allOpts = (oq.options && oq.options.length) ? oq.options.slice() : Array.from(new Set([...Object.keys(tallyA), ...Object.keys(tallyB)]));
+      const hasData = allOpts.some(o => (tallyA[o]||0) + (tallyB[o]||0) > 0);
+      if (!hasData) return;
+
+      const table = [ allOpts.map(o => tallyA[o]||0), allOpts.map(o => tallyB[o]||0) ];
+      const chi = chiSquareTest(table);
+      const canvasId = 'cv-compare-' + oq.id;
+      card.innerHTML = `<div class="qa-title">${esc(oq.label || '')}</div>
+        <div class="chart-tall-wrap" style="min-height:${Math.max(160, allOpts.length*36)}px"><canvas id="${canvasId}"></canvas></div>
+        ${chiSquareResultHTML(chi)}`;
+      cardsEl.appendChild(card);
+
+      const canvas = document.getElementById(canvasId);
+      canvas.height = Math.max(160, allOpts.length*36);
+      const chart = new Chart(canvas.getContext('2d'), {
+        type: 'bar',
+        data: { labels: allOpts, datasets: [
+          { label: 'Group A: ' + aVal, data: allOpts.map(o => tallyA[o]||0), backgroundColor: COLORS[0], borderRadius: 3 },
+          { label: 'Group B: ' + bVal, data: allOpts.map(o => tallyB[o]||0), backgroundColor: COLORS[1], borderRadius: 3 },
+        ]},
+        options: {
+          indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { position: 'bottom', labels: { boxWidth: 11, font: { size: 11 } } } },
+          scales: {
+            x: { beginAtZero: true, ticks: { precision: 0, font: { size: 11 }, color: '#a8a49e' }, grid: { color: '#f0ede6' }},
+            y: { ticks: { font: { size: 11 }, color: '#1a1916' }, grid: { display: false }},
+          }
+        }
+      });
+      chartInstances.push(chart);
+    } else if (coder) {
+      const statsA = computeDescriptives(oq, groupA, coder);
+      const statsB = computeDescriptives(oq, groupB, coder);
+      if (!statsA || !statsB) return;
+      const canvasId = 'cv-compare-' + oq.id;
+      card.innerHTML = `<div class="qa-title">${esc(oq.label || '')}</div>
+        <div class="qa-meta">Likert/number comparison — descriptive only, no significance test</div>
+        <div class="chart-tall-wrap" style="min-height:150px"><canvas id="${canvasId}"></canvas></div>
+        <div style="margin-top:10px;font-size:12.5px;color:var(--text2);line-height:1.6">
+          Group A (${esc(aVal)}) — Mean ${statsA.mean.toFixed(2)}, Median ${statsA.median.toFixed(2)}, Mode ${statsA.mode} (n=${statsA.n})<br>
+          Group B (${esc(bVal)}) — Mean ${statsB.mean.toFixed(2)}, Median ${statsB.median.toFixed(2)}, Mode ${statsB.mode} (n=${statsB.n})
+        </div>`;
+      cardsEl.appendChild(card);
+
+      const canvas = document.getElementById(canvasId);
+      const chart = new Chart(canvas.getContext('2d'), {
+        type: 'bar',
+        data: { labels: ['Mean', 'Median', 'Mode'], datasets: [
+          { label: 'Group A: ' + aVal, data: [statsA.mean, statsA.median, statsA.mode], backgroundColor: COLORS[0], borderRadius: 4, maxBarThickness: 30 },
+          { label: 'Group B: ' + bVal, data: [statsB.mean, statsB.median, statsB.mode], backgroundColor: COLORS[1], borderRadius: 4, maxBarThickness: 30 },
+        ]},
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { position: 'bottom', labels: { boxWidth: 11, font: { size: 11 } } } },
+          scales: {
+            y: { beginAtZero: true, ticks: { font: { size: 11 }, color: '#a8a49e' }, grid: { color: '#f0ede6' }},
+            x: { ticks: { font: { size: 11 }, color: '#1a1916' }, grid: { display: false }},
+          }
+        }
+      });
+      chartInstances.push(chart);
+    }
+  });
+
+  if (!cardsEl.children.length) {
+    cardsEl.outerHTML = '<div class="adv-empty">No other questions have data for these two groups yet.</div>';
+  }
 }
 
 /* ── Segment / filter ─────────────────────────────────────────────────────── */
@@ -881,6 +1263,7 @@ function renderAdvancedAnalysis(data) {
   renderCrosstabControls(form);
   renderCorrelationMatrix(form, submissions);
   renderSegmentControls(form);
+  renderCompareControls(form);
 }
 
 function filenameBase() {
@@ -1023,9 +1406,68 @@ function addCrosstabSheet(wb, form, submissions) {
   rowOpts.forEach((r, ri) => aoa.push([r, ...table[ri], table[ri].reduce((a, b) => a + b, 0)]));
   const colTotals = colOpts.map((_, ci) => table.reduce((a, r) => a + r[ci], 0));
   aoa.push(['Total', ...colTotals, colTotals.reduce((a, b) => a + b, 0)]);
+  const chi = chiSquareTest(table);
+  if (chi) {
+    aoa.push([]);
+    aoa.push(['Chi-square test of independence']);
+    aoa.push(['Chi-square (χ²)', +chi.chiSq.toFixed(3)]);
+    aoa.push(['Degrees of freedom', chi.df]);
+    aoa.push(['N', chi.n]);
+    aoa.push(['p-value', chi.p < 0.001 ? '<0.001' : +chi.p.toFixed(4)]);
+    aoa.push(['Significant at p<0.05?', chi.p < 0.05 ? 'Yes' : 'No']);
+    if (chi.lowExpected) aoa.push(['Note', 'Some expected cell counts are below 5 — result may be unreliable']);
+  }
   const ws = XLSX.utils.aoa_to_sheet(aoa);
   ws['!cols'] = [{ wch: 30 }, ...colOpts.map(() => ({ wch: 16 })), { wch: 10 }];
   XLSX.utils.book_append_sheet(wb, ws, 'Crosstab');
+}
+
+// Uses whatever the user currently has selected in the Compare Groups tab —
+// exports the on-screen comparison, not a fixed default.
+function addCompareGroupsSheet(wb, form, submissions) {
+  const qSel = document.getElementById('compare-q'), aSel = document.getElementById('compare-a'), bSel = document.getElementById('compare-b');
+  if (!qSel || !aSel || !bSel || !aSel.value || !bSel.value || aSel.value === bSel.value) return;
+  const q = form.questions.find(qq => qq.id === qSel.value);
+  const aVal = aSel.value, bVal = bSel.value;
+  const inGroup = (s, val) => { const v = s.answers?.[q.id]; return Array.isArray(v) ? v.includes(val) : v === val; };
+  const groupA = submissions.filter(s => inGroup(s, aVal));
+  const groupB = submissions.filter(s => inGroup(s, bVal));
+  if (!groupA.length || !groupB.length) return;
+
+  const aoa = [
+    [`Compare: ${q.label}`],
+    [`Group A = ${aVal} (n=${groupA.length})  vs  Group B = ${bVal} (n=${groupB.length})`],
+    [],
+  ];
+  const otherQs = form.questions.filter(qq => qq.type !== 'section' && qq.id !== q.id);
+  otherQs.forEach(oq => {
+    const coder = getNumericCoder(oq);
+    if (isCategorical(oq) || oq.type === 'checkbox') {
+      const tallyA = {}, tallyB = {};
+      groupA.forEach(s => { const v = s.answers?.[oq.id]; (Array.isArray(v) ? v : (v ? [v] : [])).forEach(vv => { if (vv) tallyA[vv] = (tallyA[vv]||0)+1; }); });
+      groupB.forEach(s => { const v = s.answers?.[oq.id]; (Array.isArray(v) ? v : (v ? [v] : [])).forEach(vv => { if (vv) tallyB[vv] = (tallyB[vv]||0)+1; }); });
+      const allOpts = (oq.options && oq.options.length) ? oq.options.slice() : Array.from(new Set([...Object.keys(tallyA), ...Object.keys(tallyB)]));
+      if (!allOpts.some(o => (tallyA[o]||0)+(tallyB[o]||0) > 0)) return;
+      aoa.push([oq.label]);
+      aoa.push(['', '', 'Group A: ' + aVal, 'Group B: ' + bVal]);
+      allOpts.forEach(o => aoa.push(['', o, tallyA[o]||0, tallyB[o]||0]));
+      const table = [ allOpts.map(o => tallyA[o]||0), allOpts.map(o => tallyB[o]||0) ];
+      const chi = chiSquareTest(table);
+      if (chi) aoa.push(['', `χ²(${chi.df}, N=${chi.n}) = ${chi.chiSq.toFixed(2)}, p ${chi.p<0.001?'<0.001':'='+chi.p.toFixed(3)} — ${chi.p<0.05?'significant':'not significant'} at p<0.05`]);
+      aoa.push([]);
+    } else if (coder) {
+      const statsA = computeDescriptives(oq, groupA, coder), statsB = computeDescriptives(oq, groupB, coder);
+      if (!statsA || !statsB) return;
+      aoa.push([oq.label]);
+      aoa.push(['', 'Mean', 'Median', 'Mode', 'N']);
+      aoa.push(['Group A: ' + aVal, +statsA.mean.toFixed(2), +statsA.median.toFixed(2), statsA.mode, statsA.n]);
+      aoa.push(['Group B: ' + bVal, +statsB.mean.toFixed(2), +statsB.median.toFixed(2), statsB.mode, statsB.n]);
+      aoa.push([]);
+    }
+  });
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [{ wch: 40 }, { wch: 22 }, { wch: 14 }, { wch: 10 }, { wch: 10 }];
+  XLSX.utils.book_append_sheet(wb, ws, 'Compare Groups');
 }
 
 function addSegmentSheet(wb, form, submissions) {
@@ -1078,6 +1520,7 @@ function exportXLSX() {
   addCorrelationSheet(wb, form, submissions);
   addCrosstabSheet(wb, form, submissions);
   addSegmentSheet(wb, form, submissions);
+  addCompareGroupsSheet(wb, form, submissions);
 
   XLSX.writeFile(wb, (form.title||'responses').replace(/[^a-z0-9]/gi,'_')+'_responses.xlsx');
 }
@@ -1224,8 +1667,10 @@ async function buildAndSavePDF() {
   const hasCrosstab = crosstabRowSel && crosstabColSel && crosstabRowSel.value !== crosstabColSel.value;
   const segQSel = document.getElementById('segment-q'), segValSel = document.getElementById('segment-val');
   const hasSegment = segQSel && segValSel && segValSel.value;
+  const compASel = document.getElementById('compare-a'), compBSel = document.getElementById('compare-b');
+  const hasCompare = compASel && compBSel && compASel.value && compBSel.value && compASel.value !== compBSel.value && document.getElementById('compare-cards');
 
-  if (descRows.length || codeable.length >= 2 || hasCrosstab || hasSegment) {
+  if (descRows.length || codeable.length >= 2 || hasCrosstab || hasSegment || hasCompare) {
     doc.addPage();
     y = margin;
     doc.setFont(undefined, 'bold'); doc.setFontSize(16); doc.setTextColor(26,25,22);
@@ -1308,6 +1753,21 @@ async function buildAndSavePDF() {
       doc.text(String(table[ri].reduce((a,b)=>a+b,0)), cx, y);
       y += 13;
     });
+    y += 8;
+    const chi = chiSquareTest(table);
+    if (chi) {
+      ensureSpace(24);
+      doc.setFont(undefined, 'normal'); doc.setFontSize(9.5); doc.setTextColor(107,103,96);
+      const sig = chi.p < 0.05;
+      const chiLine = `Chi-square: χ²(${chi.df}, N=${chi.n}) = ${chi.chiSq.toFixed(2)}, p ${chi.p<0.001?'< 0.001':'= '+chi.p.toFixed(3)} — ${sig ? 'statistically significant' : 'not statistically significant'} at p<0.05`;
+      doc.text(wrapText(chiLine, pageW-2*margin, 9.5), margin, y);
+      y += 13;
+      if (chi.lowExpected) {
+        doc.text(wrapText('Note: some expected cell counts are below 5 — result may be unreliable.', pageW-2*margin, 8.5), margin, y);
+        y += 12;
+      }
+      doc.setTextColor(26,25,22);
+    }
     y += 14;
   }
 
@@ -1346,6 +1806,49 @@ async function buildAndSavePDF() {
       });
       y += 6;
     });
+  }
+
+  // Compare Groups — captured as an image (the grid of grouped bar charts +
+  // chi-square badges is easier to read as a snapshot than reflowed text).
+  // With ~30+ questions this can be a very tall image, so it's sliced into
+  // page-sized bands rather than drawn as one image that would overflow off
+  // the bottom of the page.
+  if (hasCompare) {
+    const compareCards = document.getElementById('compare-cards');
+    if (compareCards && compareCards.children.length && typeof html2canvas !== 'undefined') {
+      try {
+        const q = form.questions.find(qq => qq.id === document.getElementById('compare-q').value);
+        const canvas = await html2canvas(compareCards, { backgroundColor: '#ffffff', scale: 1.5 });
+        const imgW = pageW - 2*margin;
+        const pxPerPt = canvas.width / imgW;
+        const maxSliceHeightPx = Math.floor((pageH - 2*margin - 30) * pxPerPt);
+
+        let offsetPx = 0, first = true;
+        while (offsetPx < canvas.height) {
+          const sliceHeightPx = Math.min(maxSliceHeightPx, canvas.height - offsetPx);
+          const sliceCanvas = document.createElement('canvas');
+          sliceCanvas.width = canvas.width;
+          sliceCanvas.height = sliceHeightPx;
+          const sctx = sliceCanvas.getContext('2d');
+          sctx.fillStyle = '#ffffff'; sctx.fillRect(0, 0, sliceCanvas.width, sliceCanvas.height);
+          sctx.drawImage(canvas, 0, offsetPx, canvas.width, sliceHeightPx, 0, 0, canvas.width, sliceHeightPx);
+
+          if (first) {
+            ensureSpace(30);
+            doc.setFont(undefined, 'bold'); doc.setFontSize(12.5); doc.setTextColor(26,25,22);
+            doc.text(`Compare Groups: ${q.label} — ${compASel.value} vs ${compBSel.value}`, margin, y);
+            y += 16;
+            first = false;
+          } else {
+            doc.addPage(); y = margin;
+          }
+          const sliceImgHeightPt = sliceHeightPx / pxPerPt;
+          doc.addImage(sliceCanvas.toDataURL('image/png'), 'PNG', margin, y, imgW, sliceImgHeightPt);
+          y += sliceImgHeightPt + 10;
+          offsetPx += sliceHeightPx;
+        }
+      } catch(e) { /* skip image if capture fails */ }
+    }
   }
 
   doc.save((form.title||'analytics').replace(/[^a-z0-9]/gi,'_') + '_analytics.pdf');
