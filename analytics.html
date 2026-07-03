@@ -315,6 +315,20 @@ header{
   </div>
 
   <div id="analytics-body"></div>
+
+  <!-- Deliberately OUTSIDE #analytics-body: that container gets fully replaced
+       every time loadAnalytics() refreshes (including right after an edit/delete
+       succeeds), which would wipe this log the instant it showed a confirmation
+       message. Living here means it survives those refreshes. -->
+  <div class="table-section" id="ai-edit-section" style="display:none">
+    <div class="section-title">✎ AI Edit — fix data-entry mistakes</div>
+    <p class="adv-hint">Give a plain-language instruction to bulk-edit or remove specific responses — e.g. "fill empty answers for &lsquo;Does the forest…&rsquo; with Positively" or "remove the first response." The AI only proposes a plan — nothing changes until you review and confirm exactly what it will do.</p>
+    <div class="ai-edit-input-row">
+      <textarea id="ai-edit-input" rows="2" placeholder="e.g. Fill empty answers for &quot;Does the forest along the lake affect the Volta Lake positively or negatively?&quot; with Positively"></textarea>
+      <button class="btn btn-primary" id="ai-edit-send-btn" onclick="sendAIEdit()">Run</button>
+    </div>
+    <div class="ai-edit-log" id="ai-edit-log"></div>
+  </div>
 </div>
 
 <!-- Confirmation modal for AI Edit — nothing that modifies/deletes real
@@ -472,8 +486,10 @@ function renderAnalytics(data) {
   if (!total) {
     document.getElementById('analytics-body').innerHTML =
       `<div class="empty-state"><h2>No responses yet</h2><p>Share your form link and responses will appear here.</p></div>`;
+    document.getElementById('ai-edit-section').style.display = 'none';
     return;
   }
+  document.getElementById('ai-edit-section').style.display = '';
 
   const first = new Date(submissions[0].submittedAt).toLocaleDateString();
   const last  = new Date(submissions[total-1].submittedAt).toLocaleDateString();
@@ -508,15 +524,6 @@ function renderAnalytics(data) {
       <div class="adv-panel" id="adv-corr"></div>
       <div class="adv-panel" id="adv-segment"></div>
       <div class="adv-panel" id="adv-compare"></div>
-    </div>
-    <div class="table-section">
-      <div class="section-title">✎ AI Edit — fix data-entry mistakes</div>
-      <p class="adv-hint">Give a plain-language instruction to bulk-edit or remove specific responses — e.g. "fill empty answers for &lsquo;Does the forest…&rsquo; with Positively" or "remove the first response." The AI only proposes a plan — nothing changes until you review and confirm exactly what it will do.</p>
-      <div class="ai-edit-input-row">
-        <textarea id="ai-edit-input" rows="2" placeholder="e.g. Fill empty answers for &quot;Does the forest along the lake affect the Volta Lake positively or negatively?&quot; with Positively"></textarea>
-        <button class="btn btn-primary" id="ai-edit-send-btn" onclick="sendAIEdit()">Run</button>
-      </div>
-      <div class="ai-edit-log" id="ai-edit-log"></div>
     </div>
     <div class="table-section">
       <div class="section-title">All responses</div>
