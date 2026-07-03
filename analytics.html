@@ -747,6 +747,35 @@ function isCategorical(q) {
   return (q.type === 'radio' || q.type === 'dropdown') && Array.isArray(q.options) && q.options.length > 0;
 }
 
+// A short-text question (like "What is your community?") has no fixed option
+// list, but in practice often only takes a handful of distinct real-world
+// values — auto-discovering those from what people actually typed lets it be
+// grouped/cross-tabbed just like a real multiple-choice question, without
+// forcing the form itself into a fixed dropdown up front.
+const MAX_DYNAMIC_CATEGORIES = 20;
+
+// Returns the option list to use for grouping this question — a categorical
+// question's real fixed options, or, for short-text/email questions, the
+// distinct non-empty values actually seen in the data (if there are few
+// enough to plausibly be categories rather than open-ended answers). Returns
+// null if the question isn't usable for grouping at all.
+function getGroupOptions(q, submissions) {
+  if (isCategorical(q)) return q.options;
+  if (q.type === 'short' || q.type === 'email') {
+    const seen = new Set();
+    (submissions || []).forEach(s => {
+      const v = s.answers?.[q.id];
+      if (v !== undefined && v !== null && String(v).trim() !== '') seen.add(String(v).trim());
+    });
+    if (seen.size >= 2 && seen.size <= MAX_DYNAMIC_CATEGORIES) return Array.from(seen).sort();
+  }
+  return null;
+}
+
+function isGroupable(q, submissions) {
+  return !!getGroupOptions(q, submissions);
+}
+
 /* ── Descriptives ─────────────────────────────────────────────────────────── */
 function computeDescriptives(q, submissions, coder) {
   const values = [];
@@ -936,8 +965,8 @@ function chiSquareResultHTML(result) {
 }
 
 function computeCrosstab(qRow, qCol, submissions) {
-  const rowOpts = qRow.options || [];
-  const colOpts = qCol.options || [];
+  const rowOpts = getGroupOptions(qRow, submissions) || [];
+  const colOpts = getGroupOptions(qCol, submissions) || [];
   const table = rowOpts.map(() => colOpts.map(() => 0));
   submissions.forEach(s => {
     const rv = s.answers?.[qRow.id], cv = s.answers?.[qCol.id];
@@ -952,11 +981,11 @@ function computeCrosstab(qRow, qCol, submissions) {
   return { rowOpts, colOpts, table };
 }
 
-function renderCrosstabControls(form) {
+function renderCrosstabControls(form, submissions) {
   const el = document.getElementById('adv-crosstab');
-  const catQs = form.questions.filter(isCategorical);
+  const catQs = form.questions.filter(q => isGroupable(q, submissions));
   if (catQs.length < 2) {
-    el.innerHTML = `<div class="adv-empty">Need at least two multiple-choice or dropdown questions to cross-tabulate.</div>`;
+    el.innerHTML = `<div class="adv-empty">Need at least two multiple-choice/dropdown questions, or short-answer questions with a handful of distinct answers (like a community name), to cross-tabulate.</div>`;
     return;
   }
   const opts = catQs.map(q => `<option value="${esc(q.id)}">${esc(q.label || '')}</option>`).join('');
@@ -1099,11 +1128,11 @@ function renderCorrelationMatrix(form, submissions) {
    significance test for every categorical question, and a mean/median/mode
    comparison (descriptive only, no significance test) for every Likert/number
    question. */
-function renderCompareControls(form) {
+function renderCompareControls(form, submissions) {
   const el = document.getElementById('adv-compare');
-  const catQs = form.questions.filter(isCategorical);
+  const catQs = form.questions.filter(q => isGroupable(q, submissions));
   if (!catQs.length) {
-    el.innerHTML = `<div class="adv-empty">Need at least one multiple-choice or dropdown question to group by (e.g. community, gender, occupation).</div>`;
+    el.innerHTML = `<div class="adv-empty">Need at least one multiple-choice/dropdown question, or a short-answer question with a handful of distinct answers (like a community name), to group by (e.g. community, gender, occupation).</div>`;
     return;
   }
   const qOpts = catQs.map(q => `<option value="${esc(q.id)}">${esc(q.label || '')}</option>`).join('');
@@ -1119,12 +1148,13 @@ function renderCompareControls(form) {
 }
 
 function updateCompareValueOptions() {
-  const { form } = currentData;
+  const { form, submissions } = currentData;
   const q = form.questions.find(qq => qq.id === document.getElementById('compare-q').value);
-  const opts = (q.options || []).map(o => `<option value="${esc(o)}">${esc(o)}</option>`).join('');
+  const groupOpts = getGroupOptions(q, submissions) || [];
+  const opts = groupOpts.map(o => `<option value="${esc(o)}">${esc(o)}</option>`).join('');
   document.getElementById('compare-a').innerHTML = opts;
   document.getElementById('compare-b').innerHTML = opts;
-  if ((q.options || []).length > 1) document.getElementById('compare-b').selectedIndex = 1;
+  if (groupOpts.length > 1) document.getElementById('compare-b').selectedIndex = 1;
   updateCompare();
 }
 
@@ -1167,11 +1197,11 @@ function updateCompare() {
     card.className = 'q-analytics-card';
     card.id = 'compcard-' + oq.id;
 
-    if (isCategorical(oq) || oq.type === 'checkbox') {
+    if (isGroupable(oq, submissions) || oq.type === 'checkbox') {
       const tallyA = {}, tallyB = {};
       groupA.forEach(s => { const v = s.answers?.[oq.id]; (Array.isArray(v) ? v : (v ? [v] : [])).forEach(vv => { if (vv) tallyA[vv] = (tallyA[vv]||0)+1; }); });
       groupB.forEach(s => { const v = s.answers?.[oq.id]; (Array.isArray(v) ? v : (v ? [v] : [])).forEach(vv => { if (vv) tallyB[vv] = (tallyB[vv]||0)+1; }); });
-      const allOpts = (oq.options && oq.options.length) ? oq.options.slice() : Array.from(new Set([...Object.keys(tallyA), ...Object.keys(tallyB)]));
+      const allOpts = getGroupOptions(oq, submissions) || Array.from(new Set([...Object.keys(tallyA), ...Object.keys(tallyB)]));
       const hasData = allOpts.some(o => (tallyA[o]||0) + (tallyB[o]||0) > 0);
       if (!hasData) return;
 
@@ -1243,11 +1273,11 @@ function updateCompare() {
 }
 
 /* ── Segment / filter ─────────────────────────────────────────────────────── */
-function renderSegmentControls(form) {
+function renderSegmentControls(form, submissions) {
   const el = document.getElementById('adv-segment');
-  const catQs = form.questions.filter(isCategorical);
+  const catQs = form.questions.filter(q => isGroupable(q, submissions));
   if (!catQs.length) {
-    el.innerHTML = `<div class="adv-empty">Need at least one multiple-choice or dropdown question to segment by.</div>`;
+    el.innerHTML = `<div class="adv-empty">Need at least one multiple-choice/dropdown question, or a short-answer question with a handful of distinct answers (like a community name), to segment by.</div>`;
     return;
   }
   const qOpts = catQs.map(q => `<option value="${esc(q.id)}">${esc(q.label || '')}</option>`).join('');
@@ -1261,10 +1291,10 @@ function renderSegmentControls(form) {
 }
 
 function updateSegmentValueOptions() {
-  const { form } = currentData;
+  const { form, submissions } = currentData;
   const q = form.questions.find(qq => qq.id === document.getElementById('segment-q').value);
   const valSel = document.getElementById('segment-val');
-  valSel.innerHTML = (q.options || []).map(o => `<option value="${esc(o)}">${esc(o)}</option>`).join('');
+  valSel.innerHTML = (getGroupOptions(q, submissions) || []).map(o => `<option value="${esc(o)}">${esc(o)}</option>`).join('');
   updateSegment();
 }
 
@@ -1286,7 +1316,7 @@ function updateSegment() {
     return;
   }
 
-  const otherQs = form.questions.filter(qq => qq.type !== 'section' && qq.id !== q.id && (isCategorical(qq) || qq.type === 'checkbox'));
+  const otherQs = form.questions.filter(qq => qq.type !== 'section' && qq.id !== q.id && (isGroupable(qq, submissions) || qq.type === 'checkbox'));
   const cards = otherQs.map(oq => {
     const tally = {};
     segment.forEach(s => {
@@ -1319,10 +1349,10 @@ function switchAdvTab(name) {
 function renderAdvancedAnalysis(data) {
   const { form, submissions } = data;
   renderDescriptives(form, submissions);
-  renderCrosstabControls(form);
+  renderCrosstabControls(form, submissions);
   renderCorrelationMatrix(form, submissions);
-  renderSegmentControls(form);
-  renderCompareControls(form);
+  renderSegmentControls(form, submissions);
+  renderCompareControls(form, submissions);
 }
 
 function filenameBase() {
@@ -1720,11 +1750,11 @@ function addCompareGroupsSheet(wb, form, submissions) {
   const otherQs = form.questions.filter(qq => qq.type !== 'section' && qq.id !== q.id);
   otherQs.forEach(oq => {
     const coder = getNumericCoder(oq);
-    if (isCategorical(oq) || oq.type === 'checkbox') {
+    if (isGroupable(oq, submissions) || oq.type === 'checkbox') {
       const tallyA = {}, tallyB = {};
       groupA.forEach(s => { const v = s.answers?.[oq.id]; (Array.isArray(v) ? v : (v ? [v] : [])).forEach(vv => { if (vv) tallyA[vv] = (tallyA[vv]||0)+1; }); });
       groupB.forEach(s => { const v = s.answers?.[oq.id]; (Array.isArray(v) ? v : (v ? [v] : [])).forEach(vv => { if (vv) tallyB[vv] = (tallyB[vv]||0)+1; }); });
-      const allOpts = (oq.options && oq.options.length) ? oq.options.slice() : Array.from(new Set([...Object.keys(tallyA), ...Object.keys(tallyB)]));
+      const allOpts = getGroupOptions(oq, submissions) || Array.from(new Set([...Object.keys(tallyA), ...Object.keys(tallyB)]));
       if (!allOpts.some(o => (tallyA[o]||0)+(tallyB[o]||0) > 0)) return;
       aoa.push([oq.label]);
       aoa.push(['', '', 'Group A: ' + aVal, 'Group B: ' + bVal]);
@@ -1755,7 +1785,7 @@ function addSegmentSheet(wb, form, submissions) {
   const val = valSel.value;
   const segment = submissions.filter(s => { const v = s.answers?.[q.id]; return Array.isArray(v) ? v.includes(val) : v === val; });
   if (!segment.length) return;
-  const otherQs = form.questions.filter(qq => qq.type !== 'section' && qq.id !== q.id && (isCategorical(qq) || qq.type === 'checkbox'));
+  const otherQs = form.questions.filter(qq => qq.type !== 'section' && qq.id !== q.id && (isGroupable(qq, submissions) || qq.type === 'checkbox'));
   const aoa = [[`Segment: ${q.label} = ${val}`], [`${segment.length} of ${submissions.length} responses (${Math.round(segment.length / submissions.length * 100)}%)`], []];
   otherQs.forEach(oq => {
     const tally = {};
@@ -2062,7 +2092,7 @@ async function buildAndSavePDF() {
     doc.text(`${segment.length} of ${submissions.length} responses (${Math.round(segment.length/submissions.length*100)}%)`, margin, y);
     doc.setTextColor(26,25,22);
     y += 16;
-    const otherQs = form.questions.filter(qq => qq.type !== 'section' && qq.id !== q.id && (isCategorical(qq) || qq.type === 'checkbox'));
+    const otherQs = form.questions.filter(qq => qq.type !== 'section' && qq.id !== q.id && (isGroupable(qq, submissions) || qq.type === 'checkbox'));
     otherQs.forEach(oq => {
       const tally = {};
       segment.forEach(s => {
