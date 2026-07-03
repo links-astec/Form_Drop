@@ -1096,10 +1096,9 @@ function updateCompare() {
     return;
   }
 
-  const filenameSafe = (aVal + '_vs_' + bVal).replace(/[^a-z0-9]/gi, '_');
   result.innerHTML = `
     <p class="adv-hint"><strong>Group A</strong>: ${esc(aVal)} (${groupA.length} responses) vs <strong>Group B</strong>: ${esc(bVal)} (${groupB.length} responses)</p>
-    <div class="adv-export-row"><button class="btn" onclick="saveElementAsImage('compare-cards', 'compare_${filenameSafe}', this)">📷 Save as image</button></div>
+    <p class="adv-hint" style="margin-top:-8px">Each card below has its own "Save as image" button — export just the comparison you need instead of one large image.</p>
     <div class="questions-grid" id="compare-cards"></div>`;
 
   const cardsEl = document.getElementById('compare-cards');
@@ -1109,6 +1108,7 @@ function updateCompare() {
     const coder = getNumericCoder(oq);
     const card = document.createElement('div');
     card.className = 'q-analytics-card';
+    card.id = 'compcard-' + oq.id;
 
     if (isCategorical(oq) || oq.type === 'checkbox') {
       const tallyA = {}, tallyB = {};
@@ -1123,7 +1123,8 @@ function updateCompare() {
       const canvasId = 'cv-compare-' + oq.id;
       card.innerHTML = `<div class="qa-title">${esc(oq.label || '')}</div>
         <div class="chart-tall-wrap" style="min-height:${Math.max(160, allOpts.length*36)}px"><canvas id="${canvasId}"></canvas></div>
-        ${chiSquareResultHTML(chi)}`;
+        ${chiSquareResultHTML(chi)}
+        <div class="adv-export-row" style="margin-top:10px"><button class="btn" onclick="saveElementAsImage('compcard-${oq.id}', 'compare_${oq.id}', this)">📷 Save as image</button></div>`;
       cardsEl.appendChild(card);
 
       const canvas = document.getElementById(canvasId);
@@ -1155,7 +1156,8 @@ function updateCompare() {
         <div style="margin-top:10px;font-size:12.5px;color:var(--text2);line-height:1.6">
           Group A (${esc(aVal)}) — Mean ${statsA.mean.toFixed(2)}, Median ${statsA.median.toFixed(2)}, Mode ${statsA.mode} (n=${statsA.n})<br>
           Group B (${esc(bVal)}) — Mean ${statsB.mean.toFixed(2)}, Median ${statsB.median.toFixed(2)}, Mode ${statsB.mode} (n=${statsB.n})
-        </div>`;
+        </div>
+        <div class="adv-export-row" style="margin-top:10px"><button class="btn" onclick="saveElementAsImage('compcard-${oq.id}', 'compare_${oq.id}', this)">📷 Save as image</button></div>`;
       cardsEl.appendChild(card);
 
       const canvas = document.getElementById(canvasId);
@@ -1197,7 +1199,6 @@ function renderSegmentControls(form) {
       <div><label class="config-label" style="display:block;margin-bottom:5px;">Segment by</label><select class="adv-select" id="segment-q" onchange="updateSegmentValueOptions()">${qOpts}</select></div>
       <div><label class="config-label" style="display:block;margin-bottom:5px;">Equal to</label><select class="adv-select" id="segment-val" onchange="updateSegment()"></select></div>
     </div>
-    <div class="adv-export-row"><button class="btn" onclick="saveElementAsImage('segment-result', 'segment', this)">📷 Save as image</button></div>
     <div id="segment-result"></div>`;
   updateSegmentValueOptions();
 }
@@ -1239,15 +1240,16 @@ function updateSegment() {
     const entries = Object.entries(tally).sort((a, b) => b[1] - a[1]);
     if (!entries.length) return '';
     const totalAns = entries.reduce((a, [, c]) => a + c, 0);
-    return `<div class="q-analytics-card">
+    return `<div class="q-analytics-card" id="segcard-${oq.id}">
       <div class="qa-title">${esc(oq.label || '')}</div>
       <div class="qa-meta">${segment.length} in segment</div>
       <div class="legend">${entries.map(([k, c]) => `<div class="legend-item"><span class="legend-label">${esc(k)}</span><span class="legend-pct">${c} (${Math.round(c / totalAns * 100)}%)</span></div>`).join('')}</div>
+      <div class="adv-export-row" style="margin-top:10px"><button class="btn" onclick="saveElementAsImage('segcard-${oq.id}', 'segment_${oq.id}', this)">📷 Save as image</button></div>
     </div>`;
   }).filter(Boolean);
 
   result.innerHTML = `
-    <p class="adv-hint"><strong>${segment.length}</strong> of ${submissions.length} responses have "${esc(q.label)}" = "${esc(val)}" (${Math.round(segment.length / submissions.length * 100)}%). Breakdown of other questions within this segment:</p>
+    <p class="adv-hint"><strong>${segment.length}</strong> of ${submissions.length} responses have "${esc(q.label)}" = "${esc(val)}" (${Math.round(segment.length / submissions.length * 100)}%). Each card below has its own "Save as image" button.</p>
     <div class="questions-grid">${cards.join('') || '<div class="adv-empty">No other multiple-choice/checkbox questions to break down.</div>'}</div>`;
 }
 
@@ -1270,6 +1272,26 @@ function filenameBase() {
   return ((currentData && currentData.form && currentData.form.title) || 'analysis').replace(/[^a-z0-9]/gi, '_');
 }
 
+// Wraps html2canvas with a fix for horizontally-scrollable containers (e.g.
+// .resp-table-wrap around the correlation matrix): by default html2canvas only
+// captures what's currently visible inside an overflow:auto box, cutting off
+// anything scrolled out of view. The onclone hook expands those wrappers in the
+// (invisible, disposable) clone html2canvas renders from, so the full width is
+// captured without affecting the live page.
+function captureElementCanvas(el, scale) {
+  return html2canvas(el, {
+    backgroundColor: '#ffffff',
+    scale: scale || 2,
+    onclone: (clonedDoc, clonedEl) => {
+      clonedEl.querySelectorAll('.resp-table-wrap').forEach(wrap => {
+        wrap.style.overflow = 'visible';
+        wrap.style.width = 'max-content';
+        wrap.style.maxWidth = 'none';
+      });
+    },
+  });
+}
+
 // Snapshots any DOM element (a table, a whole panel, etc.) as a downloadable PNG.
 // Used by the "📷 Save as image" buttons throughout Advanced Analysis so any
 // individual result — descriptives, a crosstab, the correlation matrix, a
@@ -1280,7 +1302,7 @@ async function saveElementAsImage(elId, nameSuffix, btn) {
   const prevText = btn ? btn.textContent : null;
   if (btn) { btn.disabled = true; btn.textContent = 'Rendering…'; }
   try {
-    const canvas = await html2canvas(el, { backgroundColor: '#ffffff', scale: 2 });
+    const canvas = await captureElementCanvas(el);
     const a = document.createElement('a');
     a.download = `${filenameBase()}_${nameSuffix}.png`;
     a.href = canvas.toDataURL('image/png');
@@ -1711,7 +1733,7 @@ async function buildAndSavePDF() {
     const corrContent = document.getElementById('adv-corr-content');
     if (corrContent && typeof html2canvas !== 'undefined') {
       try {
-        const canvas = await html2canvas(corrContent, { backgroundColor: '#ffffff', scale: 2 });
+        const canvas = await captureElementCanvas(corrContent);
         const imgW = pageW - 2*margin;
         const imgH = canvas.height * (imgW / canvas.width);
         ensureSpace(30);
@@ -1818,7 +1840,7 @@ async function buildAndSavePDF() {
     if (compareCards && compareCards.children.length && typeof html2canvas !== 'undefined') {
       try {
         const q = form.questions.find(qq => qq.id === document.getElementById('compare-q').value);
-        const canvas = await html2canvas(compareCards, { backgroundColor: '#ffffff', scale: 1.5 });
+        const canvas = await captureElementCanvas(compareCards, 1.5);
         const imgW = pageW - 2*margin;
         const pxPerPt = canvas.width / imgW;
         const maxSliceHeightPx = Math.floor((pageH - 2*margin - 30) * pxPerPt);
