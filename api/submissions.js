@@ -1,4 +1,5 @@
-// PATCH  /api/submissions              — bulk-update one question's answer across specific submissions
+// PATCH  /api/submissions              — bulk-update one question's answer across specific submissions,
+//                                          OR rename respondents (each id can get its own new name)
 // DELETE /api/submissions?formId=&ids= — delete specific submissions
 //
 // Used by analytics.html's "AI Edit" feature to fix data-entry mistakes in
@@ -21,11 +22,34 @@ module.exports = async function handler(req, res) {
     return res.status(500).json({ ok: false, error: "DATABASE_URL is not set in Vercel environment variables." });
   }
 
-  // PATCH — set one question's answer for a specific set of submissions
+  // PATCH — either bulk-set one question's answer for a set of submissions
+  // ({formId, ids, questionId, value}), or rename respondents where each
+  // submission can get its own distinct name ({formId, renames: [{id, respondentName}]})
   if (req.method === "PATCH") {
-    const { formId, ids, questionId, value } = req.body;
+    const { formId, ids, questionId, value, renames } = req.body;
+
+    if (Array.isArray(renames) && renames.length) {
+      if (!formId) return res.status(400).json({ ok: false, error: "formId is required" });
+      const valid = renames.filter(r => r && Number.isInteger(Number(r.id)) && typeof r.respondentName === "string");
+      if (!valid.length) return res.status(400).json({ ok: false, error: "renames must be [{id, respondentName}]" });
+      try {
+        let updated = 0;
+        for (const r of valid) {
+          const result = await query(
+            `UPDATE submissions SET respondent_name = $1 WHERE id = $2 AND form_id = $3`,
+            [r.respondentName, Number(r.id), formId]
+          );
+          updated += result.rowCount;
+        }
+        return res.json({ ok: true, updated });
+      } catch (err) {
+        console.error("Bulk rename error:", err);
+        return res.status(500).json({ ok: false, error: err.message });
+      }
+    }
+
     if (!formId || !Array.isArray(ids) || !ids.length || !questionId) {
-      return res.status(400).json({ ok: false, error: "formId, ids, and questionId are required" });
+      return res.status(400).json({ ok: false, error: "formId, ids, and questionId (or formId + renames) are required" });
     }
     const numericIds = ids.map(Number).filter(n => Number.isInteger(n));
     if (!numericIds.length) {
