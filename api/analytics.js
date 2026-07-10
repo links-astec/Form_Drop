@@ -21,7 +21,7 @@ module.exports = async function handler(req, res) {
   try {
     // Form definition
     const { rows: formRows } = await query(
-      `SELECT id, title, description, questions FROM forms WHERE id = $1`,
+      `SELECT id, title, description, questions, analysis_groups FROM forms WHERE id = $1`,
       [formId]
     );
     if (!formRows.length) {
@@ -30,7 +30,7 @@ module.exports = async function handler(req, res) {
 
     // All submissions
     const { rows: subs } = await query(
-      `SELECT id, answers, submitted_at, respondent_name FROM submissions WHERE form_id = $1 ORDER BY submitted_at ASC`,
+      `SELECT id, answers, submitted_at, respondent_name, theme_tags FROM submissions WHERE form_id = $1 ORDER BY submitted_at ASC`,
       [formId]
     );
 
@@ -42,12 +42,14 @@ module.exports = async function handler(req, res) {
         title: form.title,
         desc: form.description,
         questions: form.questions,
+        groups: form.analysis_groups || [],
       },
       submissions: subs.map(s => ({
         id: s.id,
         answers: s.answers,
         submittedAt: s.submitted_at,
         respondentName: s.respondent_name || null,
+        themeTags: s.theme_tags || {},
       })),
       total: subs.length,
     });

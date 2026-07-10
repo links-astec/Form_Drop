@@ -25,6 +25,8 @@ async function ensureTables() {
     ALTER TABLE submissions ADD COLUMN IF NOT EXISTS respondent_name TEXT;
     ALTER TABLE forms ADD COLUMN IF NOT EXISTS numbered BOOLEAN NOT NULL DEFAULT false;
     ALTER TABLE forms ADD COLUMN IF NOT EXISTS cover JSONB NOT NULL DEFAULT '{}';
+    ALTER TABLE forms ADD COLUMN IF NOT EXISTS analysis_groups JSONB NOT NULL DEFAULT '[]';
+    ALTER TABLE submissions ADD COLUMN IF NOT EXISTS theme_tags JSONB NOT NULL DEFAULT '{}';
   `);
 }
 

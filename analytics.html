@@ -463,6 +463,7 @@ async function loadAnalytics(formId) {
     if (!data.ok) throw new Error(data.error || 'Server error');
 
     currentData = data;
+    applyDerivedGroups(currentData);
     status.className = 'config-status ok';
     status.textContent = `✓ ${data.total} response${data.total===1?'':'s'} for "${data.form.title}"`;
     renderAnalytics(data);
@@ -501,7 +502,7 @@ function renderAnalytics(data) {
   document.getElementById('analytics-body').innerHTML = `
     <div class="stats-row">
       <div class="stat-card"><div class="stat-label">Total responses</div><div class="stat-value">${total}</div></div>
-      <div class="stat-card"><div class="stat-label">Questions</div><div class="stat-value">${form.questions.length}</div></div>
+      <div class="stat-card"><div class="stat-label">Questions</div><div class="stat-value">${form.questions.filter(q => !q.derived).length}</div></div>
       <div class="stat-card"><div class="stat-label">First response</div><div class="stat-value" style="font-size:17px">${first}</div></div>
       <div class="stat-card"><div class="stat-label">Latest response</div><div class="stat-value" style="font-size:17px">${last}</div></div>
     </div>
@@ -518,12 +519,18 @@ function renderAnalytics(data) {
         <button class="adv-tab-btn" data-adv="corr" onclick="switchAdvTab('corr')">Correlation</button>
         <button class="adv-tab-btn" data-adv="segment" onclick="switchAdvTab('segment')">Segment</button>
         <button class="adv-tab-btn" data-adv="compare" onclick="switchAdvTab('compare')">Compare Groups</button>
+        <button class="adv-tab-btn" data-adv="groups" onclick="switchAdvTab('groups')">Groups &amp; Codebook</button>
+        <button class="adv-tab-btn" data-adv="quality" onclick="switchAdvTab('quality')">Data Quality</button>
+        <button class="adv-tab-btn" data-adv="themes" onclick="switchAdvTab('themes')">Themes</button>
       </div>
       <div class="adv-panel active" id="adv-desc"></div>
       <div class="adv-panel" id="adv-crosstab"></div>
       <div class="adv-panel" id="adv-corr"></div>
       <div class="adv-panel" id="adv-segment"></div>
       <div class="adv-panel" id="adv-compare"></div>
+      <div class="adv-panel" id="adv-groups"></div>
+      <div class="adv-panel" id="adv-quality"></div>
+      <div class="adv-panel" id="adv-themes"></div>
     </div>
     <div class="table-section">
       <div class="section-title">All responses</div>
@@ -644,7 +651,11 @@ function renderChoiceChart(q, submissions, type) {
   });
   const labels = Object.keys(tally);
   const values = Object.values(tally);
-  const total = values.reduce((a,b)=>a+b,0) || 1;
+  // % base = respondents who answered this question, not total selections —
+  // for a single-select question these are the same number; for checkbox
+  // (multi-select) they differ, and % should be of respondents so a
+  // multi-response breakdown correctly sums to more than 100%.
+  const total = submissions.filter(s => { const v = s.answers?.[q.id]; return Array.isArray(v) ? v.length > 0 : !!v; }).length || 1;
   if (!labels.length) { area.innerHTML = `<div class="no-answers">No answers yet.</div>`; return; }
 
   const existing = chartInstances.find(c => c.canvas && c.canvas.id === 'cv-' + q.id);
@@ -745,6 +756,26 @@ function getNumericCoder(q) {
   }
   return null;
 }
+
+// Collapses a 5-point ordinal code (1..5, from getNumericCoder) to 3 or 5
+// levels, per analysis_guideline.md §3's sparse-cell fix: collapse before
+// testing rather than leaving cells with expected count < 5. 2-level puts the
+// neutral midpoint on the "Not agree" side, matching the guideline's own
+// "Agree / Not-agree" phrasing. Levels=5 is a no-op passthrough.
+function collapseLikertCode(code, levels) {
+  if (code == null) return null;
+  if (levels === 2) return code >= 4 ? 'Agree' : 'Not agree';
+  if (levels === 3) return code <= 2 ? 'Disagree' : code === 3 ? 'Neutral' : 'Agree';
+  return String(code);
+}
+// True only for the specific 5-point "agree family" scale the guideline's
+// group-C Likert items use — the collapse labels (Agree/Neutral/Disagree)
+// wouldn't make sense worded that way for e.g. the poor..excellent family.
+function isAgreeLikert(q) {
+  return (q.type === 'radio' || q.type === 'dropdown') && Array.isArray(q.options) && q.options.length === 5 &&
+    q.options.every(o => ['strongly disagree','disagree','neutral','neither agree nor disagree','undecided','agree','strongly agree'].includes(normWord(o)));
+}
+
 function isCategorical(q) {
   return (q.type === 'radio' || q.type === 'dropdown') && Array.isArray(q.options) && q.options.length > 0;
 }
@@ -790,6 +821,63 @@ function questionNumberMap(form) {
   return map;
 }
 
+/* ── Derived groups ("Stratum") ───────────────────────────────────────────────
+   A derived group (e.g. "Stratum" = Lakeside/Inland, bucketing the community
+   question's 8 raw values into 2) is represented as a synthetic question
+   object appended to form.questions, with its bucketed value precomputed onto
+   each submission's answers under a synthetic id ("grp_<id>"). Every existing
+   function that reads s.answers?.[q.id] and iterates form.questions keeps
+   working completely unmodified — a derived group just looks like an ordinary
+   radio question. Safe to call repeatedly (e.g. after editing groups): it
+   first strips any previously-injected synthetic state before reapplying. */
+function applyDerivedGroups(data) {
+  const { form, submissions } = data;
+  form.questions = form.questions.filter(q => !q.derived);
+  submissions.forEach(s => {
+    Object.keys(s.answers || {}).forEach(k => { if (k.startsWith('grp_')) delete s.answers[k]; });
+  });
+
+  const groups = form.groups || [];
+  groups.forEach(g => {
+    const qid = 'grp_' + g.id;
+    const valueMap = {};
+    (g.buckets || []).forEach(b => (b.values || []).forEach(v => { valueMap[v] = b.name; }));
+    submissions.forEach(s => {
+      const raw = s.answers ? s.answers[g.sourceQuestionId] : undefined;
+      const rv = Array.isArray(raw) ? raw[0] : raw;
+      const bucket = valueMap[rv];
+      if (bucket) {
+        if (!s.answers) s.answers = {};
+        s.answers[qid] = bucket;
+      }
+    });
+    form.questions.push({
+      id: qid,
+      type: 'radio',
+      label: g.name,
+      options: (g.buckets || []).map(b => b.name),
+      derived: true,
+      sourceQuestionId: g.sourceQuestionId,
+    });
+  });
+}
+
+// Community/short-text values pre-2026-07 sometimes had typos ("Nyamben" vs
+// "Nyameben") that silently split one respondent's real group in two — used
+// by the Data Quality tab's near-duplicate detector to catch this class of
+// bug automatically instead of relying on someone spotting it by eye.
+function levenshtein(a, b) {
+  const m = a.length, n = b.length;
+  const dp = Array.from({ length: m + 1 }, (_, i) => [i, ...Array(n).fill(0)]);
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] = a[i-1] === b[j-1] ? dp[i-1][j-1] : 1 + Math.min(dp[i-1][j-1], dp[i-1][j], dp[i][j-1]);
+    }
+  }
+  return dp[m][n];
+}
+
 /* ── Descriptives ─────────────────────────────────────────────────────────── */
 function computeDescriptives(q, submissions, coder) {
   const values = [];
@@ -813,6 +901,33 @@ function computeDescriptives(q, submissions, coder) {
 
 let descChartStat = 'mean';
 let descChartRows = [];
+
+// Full SA/A/N/D/SD distribution + %Agree collapse for one "agree family"
+// Likert item — analysis_guideline.md §2's per-item Likert deliverable
+// (mode + full distribution + %Agree, whole-sample), reusing getNumericCoder
+// (1..5) and collapseLikertCode for the 3-level/2-level summaries.
+function likertDistribution(q, submissions) {
+  const coder = getNumericCoder(q);
+  const counts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+  let n = 0;
+  submissions.forEach(s => {
+    const raw = s.answers?.[q.id];
+    if (raw === undefined || raw === null || raw === '') return;
+    const code = coder(raw);
+    if (code == null) return;
+    counts[code] = (counts[code] || 0) + 1;
+    n++;
+  });
+  const pct = k => n ? Math.round(counts[k] / n * 100) : 0;
+  const agree = counts[4] + counts[5], neutral = counts[3], disagree = counts[1] + counts[2];
+  return {
+    n, counts, pct,
+    agreePct: n ? Math.round(agree / n * 100) : 0,
+    neutralPct: n ? Math.round(neutral / n * 100) : 0,
+    disagreePct: n ? Math.round(disagree / n * 100) : 0,
+    notAgreePct: n ? Math.round((neutral + disagree) / n * 100) : 0,
+  };
+}
 
 function renderDescriptives(form, submissions) {
   const el = document.getElementById('adv-desc');
@@ -849,6 +964,35 @@ function renderDescriptives(form, submissions) {
         </tbody>
       </table></div>
     </div>
+
+    ${(() => {
+      const likertRows = rows.filter(r => isAgreeLikert(r.q));
+      if (!likertRows.length) return '';
+      return `<div class="section-title" style="margin-top:24px;font-size:14px">Likert Distribution</div>
+        <p class="adv-hint">Full 5-level distribution + %Agree collapse for every Strongly Disagree…Strongly Agree item, whole sample.</p>
+        <div class="adv-export-row"><button class="btn" onclick="saveElementAsImage('adv-likert-dist-content', 'likert_distribution', this)">📷 Save as image</button></div>
+        <div id="adv-likert-dist-content">
+          <div class="resp-table-wrap"><table class="adv-table">
+            <thead><tr><th>Question</th><th>N</th><th>SD</th><th>D</th><th>N</th><th>A</th><th>SA</th><th>%Agree</th><th>%Neutral</th><th>%Disagree</th><th>2-level: Agree / Not agree</th></tr></thead>
+            <tbody>${likertRows.map(({ q }) => {
+              const d = likertDistribution(q, submissions);
+              return `<tr>
+                <td style="text-align:left">${esc(q.label || '')}</td>
+                <td>${d.n}</td>
+                <td>${d.counts[1]} (${d.pct(1)}%)</td>
+                <td>${d.counts[2]} (${d.pct(2)}%)</td>
+                <td>${d.counts[3]} (${d.pct(3)}%)</td>
+                <td>${d.counts[4]} (${d.pct(4)}%)</td>
+                <td>${d.counts[5]} (${d.pct(5)}%)</td>
+                <td>${d.agreePct}%</td>
+                <td>${d.neutralPct}%</td>
+                <td>${d.disagreePct}%</td>
+                <td>${d.agreePct}% / ${d.notAgreePct}%</td>
+              </tr>`;
+            }).join('')}</tbody>
+          </table></div>
+        </div>`;
+    })()}
 
     <div class="section-title" style="margin-top:24px;font-size:14px">Likert Comparison Chart</div>
     <p class="adv-hint">Pick which statistic to compare across every scale question — mean, median, or mode.</p>
@@ -946,9 +1090,37 @@ function chiSquarePValue(chiSq, df) {
   return regularizedGammaQ(df / 2, chiSq / 2);
 }
 
-// Computes chi-square statistic, degrees of freedom, and p-value from an
-// observed contingency table (array of row arrays). Returns null if the table
-// is empty or any expected cell count is 0 (test isn't meaningful then).
+// log(n choose k), reusing the same logGamma already verified for chi-square —
+// n! = Gamma(n+1).
+function logChoose(n, k) {
+  if (k < 0 || k > n) return -Infinity;
+  return logGamma(n + 1) - logGamma(k + 1) - logGamma(n - k + 1);
+}
+
+// Fisher's exact test (two-sided) for a 2x2 table [[a,b],[c,d]] — the sparse-
+// table fallback analysis_guideline.md §3 asks for. Enumerates every table
+// with the same margins via the hypergeometric distribution and sums the
+// probability of every table at least as extreme as the observed one, reusing
+// logChoose/logGamma rather than computing factorials directly (avoids
+// overflow for the table sizes this study can plausibly reach).
+function fisherExactP(a, b, c, d) {
+  const row1 = a + b, row2 = c + d, col1 = a + c, n = row1 + row2;
+  const logDenom = logChoose(n, col1);
+  const lo = Math.max(0, col1 - row2), hi = Math.min(row1, col1);
+  const logPObserved = logChoose(row1, a) + logChoose(row2, col1 - a) - logDenom;
+  let p = 0;
+  for (let x = lo; x <= hi; x++) {
+    const logPx = logChoose(row1, x) + logChoose(row2, col1 - x) - logDenom;
+    if (logPx <= logPObserved + 1e-9) p += Math.exp(logPx);
+  }
+  return Math.min(1, p);
+}
+
+// Computes chi-square statistic, degrees of freedom, p-value, and Cramér's V
+// (effect size, 0..1) from an observed contingency table (array of row
+// arrays). For a 2x2 table also computes Fisher's exact test, since that's
+// exactly the shape the guideline's own collapse recommendation produces.
+// Returns null if the table is empty or has zero total.
 function chiSquareTest(table) {
   const rows = table.length, cols = table[0] ? table[0].length : 0;
   if (!rows || !cols) return null;
@@ -966,27 +1138,48 @@ function chiSquareTest(table) {
   }
   const df = (rows - 1) * (cols - 1);
   if (df <= 0) return null;
-  return { chiSq, df, p: chiSquarePValue(chiSq, df), lowExpected, n: grand };
+  const cramersV = Math.sqrt(chiSq / (grand * Math.min(rows - 1, cols - 1)));
+  const fisherP = (rows === 2 && cols === 2) ? fisherExactP(table[0][0], table[0][1], table[1][0], table[1][1]) : null;
+  return { chiSq, df, p: chiSquarePValue(chiSq, df), lowExpected, n: grand, cramersV, fisherP };
 }
 
 function chiSquareResultHTML(result) {
   if (!result) return '';
   const sig = result.p < 0.05;
+  const fisherSig = result.fisherP !== null && result.fisherP < 0.05;
   return `<div style="margin-top:14px;font-size:13px;color:var(--text2);line-height:1.7">
     <strong>Chi-square test of independence:</strong> χ²(${result.df}, N=${result.n}) = ${result.chiSq.toFixed(2)}, p ${result.p < 0.001 ? '&lt; 0.001' : '= ' + result.p.toFixed(3)}
     <span class="sig-badge ${sig ? 'sig' : 'notsig'}">${sig ? '✓ Statistically significant (p < 0.05)' : 'Not statistically significant (p ≥ 0.05)'}</span>
-    ${result.lowExpected ? '<br><span style="color:var(--text3);font-size:12px">⚠ Some expected cell counts are below 5 — chi-square may be unreliable with this little data; consider grouping categories or collecting more responses.</span>' : ''}
+    <br><span style="color:var(--text3);font-size:12px">Cramér's V (effect size) = ${result.cramersV.toFixed(2)}</span>
+    ${result.fisherP !== null ? `<br><strong>Fisher's exact test (2×2):</strong> p ${result.fisherP < 0.001 ? '&lt; 0.001' : '= ' + result.fisherP.toFixed(3)} <span class="sig-badge ${fisherSig ? 'sig' : 'notsig'}">${fisherSig ? '✓ significant' : 'not significant'}</span>` : ''}
+    ${result.lowExpected ? '<br><span style="color:var(--text3);font-size:12px">⚠ Some expected cell counts are below 5 — chi-square may be unreliable with this little data' + (result.fisherP === null ? '; consider collapsing to a 2×2 table for Fisher\'s exact test, or grouping categories.' : '; rely on Fisher\'s exact test above instead.') + '</span>' : ''}
   </div>`;
 }
 
-function computeCrosstab(qRow, qCol, submissions) {
-  const rowOpts = getGroupOptions(qRow, submissions) || [];
-  const colOpts = getGroupOptions(qCol, submissions) || [];
+// levels: how many buckets to collapse a 5-point "agree family" Likert axis
+// into (5 = no collapse). Non-Likert axes ignore levels entirely.
+function likertLevelOrder(levels) {
+  if (levels === 2) return ['Not agree', 'Agree'];
+  if (levels === 3) return ['Disagree', 'Neutral', 'Agree'];
+  return null;
+}
+
+function computeCrosstab(qRow, qCol, submissions, rowLevels, colLevels) {
+  const rowCollapse = rowLevels && rowLevels !== 5 && isAgreeLikert(qRow);
+  const colCollapse = colLevels && colLevels !== 5 && isAgreeLikert(qCol);
+  const rowOpts = rowCollapse ? likertLevelOrder(rowLevels) : (getGroupOptions(qRow, submissions) || []);
+  const colOpts = colCollapse ? likertLevelOrder(colLevels) : (getGroupOptions(qCol, submissions) || []);
+  const rowCoder = rowCollapse ? getNumericCoder(qRow) : null;
+  const colCoder = colCollapse ? getNumericCoder(qCol) : null;
   const table = rowOpts.map(() => colOpts.map(() => 0));
   submissions.forEach(s => {
     const rv = s.answers?.[qRow.id], cv = s.answers?.[qCol.id];
-    const rvals = Array.isArray(rv) ? rv : (rv ? [rv] : []);
-    const cvals = Array.isArray(cv) ? cv : (cv ? [cv] : []);
+    const rvals = rowCollapse
+      ? (() => { const code = rowCoder(rv); return code == null ? [] : [collapseLikertCode(code, rowLevels)]; })()
+      : (Array.isArray(rv) ? rv : (rv ? [rv] : []));
+    const cvals = colCollapse
+      ? (() => { const code = colCoder(cv); return code == null ? [] : [collapseLikertCode(code, colLevels)]; })()
+      : (Array.isArray(cv) ? cv : (cv ? [cv] : []));
     rvals.forEach(rvv => {
       const ri = rowOpts.indexOf(rvv);
       if (ri < 0) return;
@@ -1004,6 +1197,7 @@ function renderCrosstabControls(form, submissions) {
     return;
   }
   const opts = catQs.map(q => `<option value="${esc(q.id)}">${esc(q.label || '')}</option>`).join('');
+  const levelOpts = `<option value="5">5-level (no collapse)</option><option value="3">3-level (Agree/Neutral/Disagree)</option><option value="2">2-level (Agree/Not agree)</option>`;
   el.innerHTML = `
     <div class="adv-controls">
       <div><label class="config-label" style="display:block;margin-bottom:5px;">Rows</label><select class="adv-select" id="crosstab-row" onchange="updateCrosstab()">${opts}</select></div>
@@ -1013,6 +1207,10 @@ function renderCrosstabControls(form, submissions) {
         <option value="row">Row %</option>
         <option value="col">Column %</option>
       </select></div>
+    </div>
+    <div class="adv-controls" id="crosstab-collapse-controls" style="margin-top:-6px">
+      <div id="crosstab-row-levels-wrap" style="display:none"><label class="config-label" style="display:block;margin-bottom:5px;">Collapse rows</label><select class="adv-select" id="crosstab-row-levels" onchange="updateCrosstab()">${levelOpts}</select></div>
+      <div id="crosstab-col-levels-wrap" style="display:none"><label class="config-label" style="display:block;margin-bottom:5px;">Collapse columns</label><select class="adv-select" id="crosstab-col-levels" onchange="updateCrosstab()">${levelOpts}</select></div>
     </div>
     <div class="adv-export-row"><button class="btn" onclick="saveElementAsImage('crosstab-result', 'crosstab', this)">📷 Save as image</button></div>
     <div id="crosstab-result"></div>`;
@@ -1031,7 +1229,12 @@ function updateCrosstab() {
   if (!qRow || !qCol) { result.innerHTML = ''; return; }
   if (qRow.id === qCol.id) { result.innerHTML = `<div class="adv-empty">Choose two different questions.</div>`; return; }
 
-  const { rowOpts, colOpts, table } = computeCrosstab(qRow, qCol, submissions);
+  document.getElementById('crosstab-row-levels-wrap').style.display = isAgreeLikert(qRow) ? '' : 'none';
+  document.getElementById('crosstab-col-levels-wrap').style.display = isAgreeLikert(qCol) ? '' : 'none';
+  const rowLevels = isAgreeLikert(qRow) ? Number(document.getElementById('crosstab-row-levels').value) : 5;
+  const colLevels = isAgreeLikert(qCol) ? Number(document.getElementById('crosstab-col-levels').value) : 5;
+
+  const { rowOpts, colOpts, table } = computeCrosstab(qRow, qCol, submissions, rowLevels, colLevels);
   const rowTotals = table.map(r => r.reduce((a, b) => a + b, 0));
   const colTotals = colOpts.map((_, ci) => table.reduce((a, r) => a + r[ci], 0));
   const grandTotal = rowTotals.reduce((a, b) => a + b, 0);
@@ -1174,6 +1377,93 @@ function updateCompareValueOptions() {
   updateCompare();
 }
 
+// Tallies one otherQ for group A/B at a given Likert collapse level (5 = raw
+// word tally, used for non-Likert categorical/checkbox questions too).
+function tallyGroupForLevels(oq, group, levels, submissions) {
+  const useCollapse = levels !== 5 && isAgreeLikert(oq);
+  const coder = useCollapse ? getNumericCoder(oq) : null;
+  const opts = useCollapse ? likertLevelOrder(levels) : (getGroupOptions(oq, submissions) || []);
+  const tally = {};
+  group.forEach(s => {
+    const v = s.answers?.[oq.id];
+    if (useCollapse) {
+      const code = coder(v);
+      if (code == null) return;
+      const label = collapseLikertCode(code, levels);
+      tally[label] = (tally[label] || 0) + 1;
+    } else {
+      (Array.isArray(v) ? v : (v ? [v] : [])).forEach(vv => { if (vv) tally[vv] = (tally[vv] || 0) + 1; });
+    }
+  });
+  return { opts, tally };
+}
+
+// Builds the group A vs B table for one item, automatically collapsing a
+// sparse Likert 5-level table to 3-level then 2-level (per
+// analysis_guideline.md §3) and reporting which collapse (if any) was used —
+// operationalizes the guideline's own decision tree instead of a manual click.
+function collapsedCompareTable(oq, groupA, groupB, submissions) {
+  let levels = 5, collapseNote = '';
+  let { opts: allOpts, tally: tallyA } = tallyGroupForLevels(oq, groupA, 5, submissions);
+  let tallyB = tallyGroupForLevels(oq, groupB, 5, submissions).tally;
+  let table = [ allOpts.map(o => tallyA[o] || 0), allOpts.map(o => tallyB[o] || 0) ];
+  let chi = chiSquareTest(table);
+
+  if (chi && chi.lowExpected && isAgreeLikert(oq)) {
+    for (const tryLevels of [3, 2]) {
+      const rA = tallyGroupForLevels(oq, groupA, tryLevels, submissions);
+      const rB = tallyGroupForLevels(oq, groupB, tryLevels, submissions);
+      const t2 = [ rA.opts.map(o => rA.tally[o] || 0), rA.opts.map(o => rB.tally[o] || 0) ];
+      const chi2 = chiSquareTest(t2);
+      if (!chi2) continue;
+      allOpts = rA.opts; tallyA = rA.tally; tallyB = rB.tally; table = t2; chi = chi2; levels = tryLevels;
+      collapseNote = `Collapsed to ${tryLevels}-level (${tryLevels === 2 ? 'Agree/Not agree' : 'Agree/Neutral/Disagree'}) — the raw 5-level table had expected cell counts below 5.`;
+      if (!chi2.lowExpected) break;
+    }
+  }
+  return { allOpts, tallyA, tallyB, table, chi, collapseNote };
+}
+
+// The guideline's deliverable §7: a compact "which items differ significantly
+// between Group A and Group B" summary, run across every cross-tabbable item
+// for whichever group-by variable is currently selected (native Gender or a
+// derived Stratum) — auto-collapsing sparse Likert tables the same way the
+// per-item cards above do.
+function runFullComparisonReport() {
+  const { form, submissions } = currentData;
+  const qSel = document.getElementById('compare-q'), aSel = document.getElementById('compare-a'), bSel = document.getElementById('compare-b');
+  const q = form.questions.find(qq => qq.id === qSel.value);
+  const aVal = aSel.value, bVal = bSel.value;
+  const inGroup = (s, val) => { const v = s.answers?.[q.id]; return Array.isArray(v) ? v.includes(val) : v === val; };
+  const groupA = submissions.filter(s => inGroup(s, aVal));
+  const groupB = submissions.filter(s => inGroup(s, bVal));
+  const otherQs = form.questions.filter(qq => qq.type !== 'section' && qq.id !== q.id && (isGroupable(qq, submissions) || qq.type === 'checkbox'));
+
+  const rows = [];
+  otherQs.forEach(oq => {
+    const { chi, collapseNote } = collapsedCompareTable(oq, groupA, groupB, submissions);
+    if (!chi) return;
+    const test = chi.fisherP !== null ? `Fisher's exact${collapseNote ? ' (2-level)' : ''}` : (collapseNote ? 'Chi-square (3-level)' : 'Chi-square');
+    const p = chi.fisherP !== null ? chi.fisherP : chi.p;
+    rows.push({ label: oq.label || oq.id, test, p, sig: p < 0.05, lowExpected: chi.lowExpected && chi.fisherP === null, v: chi.cramersV });
+  });
+  rows.sort((a, b) => a.p - b.p);
+
+  const el = document.getElementById('compare-report');
+  if (!el) return;
+  el.innerHTML = `
+    <div class="q-analytics-card" id="compare-report-card" style="margin-bottom:14px">
+      <div class="qa-title">Full comparison report — ${esc(aVal)} vs ${esc(bVal)}</div>
+      <div class="qa-meta">${rows.filter(r => r.sig).length} of ${rows.length} items differ significantly at p &lt; 0.05</div>
+      <div class="resp-table-wrap" style="margin-top:10px"><table class="adv-table">
+        <thead><tr><th>Question</th><th>Test used</th><th>p-value</th><th>Cramér's V</th><th>Significant?</th></tr></thead>
+        <tbody>${rows.map(r => `<tr><td style="text-align:left">${esc(r.label)}${r.lowExpected ? ' ⚠' : ''}</td><td>${esc(r.test)}</td><td>${r.p < 0.001 ? '&lt; 0.001' : r.p.toFixed(3)}</td><td>${r.v.toFixed(2)}</td><td>${r.sig ? '<span class="sig-badge sig">✓ Yes</span>' : '<span class="sig-badge notsig">No</span>'}</td></tr>`).join('')}</tbody>
+      </table></div>
+      <p class="adv-hint" style="margin-top:8px">⚠ = expected cell counts still below 5 even after collapsing — treat that item's result cautiously.</p>
+      <div class="adv-export-row" style="margin-top:10px"><button class="btn" onclick="saveElementAsImage('compare-report-card', 'comparison_report', this)">📷 Save as image</button></div>
+    </div>`;
+}
+
 function updateCompare() {
   const { form, submissions } = currentData;
   const qSel = document.getElementById('compare-q'), aSel = document.getElementById('compare-a'), bSel = document.getElementById('compare-b');
@@ -1202,6 +1492,8 @@ function updateCompare() {
   result.innerHTML = `
     <p class="adv-hint"><strong>Group A</strong>: ${esc(aVal)} (${groupA.length} responses) vs <strong>Group B</strong>: ${esc(bVal)} (${groupB.length} responses)</p>
     <p class="adv-hint" style="margin-top:-8px">Each card below has its own "Save as image" button — export just the comparison you need instead of one large image.</p>
+    <div class="adv-controls" style="margin:4px 0 10px"><button class="btn btn-primary" onclick="runFullComparisonReport()">Run full comparison report</button></div>
+    <div id="compare-report"></div>
     <div class="questions-grid" id="compare-cards"></div>`;
 
   const cardsEl = document.getElementById('compare-cards');
@@ -1214,17 +1506,20 @@ function updateCompare() {
     card.id = 'compcard-' + oq.id;
 
     if (isGroupable(oq, submissions) || oq.type === 'checkbox') {
-      const tallyA = {}, tallyB = {};
-      groupA.forEach(s => { const v = s.answers?.[oq.id]; (Array.isArray(v) ? v : (v ? [v] : [])).forEach(vv => { if (vv) tallyA[vv] = (tallyA[vv]||0)+1; }); });
-      groupB.forEach(s => { const v = s.answers?.[oq.id]; (Array.isArray(v) ? v : (v ? [v] : [])).forEach(vv => { if (vv) tallyB[vv] = (tallyB[vv]||0)+1; }); });
-      const allOpts = getGroupOptions(oq, submissions) || Array.from(new Set([...Object.keys(tallyA), ...Object.keys(tallyB)]));
+      const collapsed = collapsedCompareTable(oq, groupA, groupB, submissions);
+      const { allOpts, tallyA, tallyB, table, chi, collapseNote } = collapsed;
       const hasData = allOpts.some(o => (tallyA[o]||0) + (tallyB[o]||0) > 0);
       if (!hasData) return;
 
-      const table = [ allOpts.map(o => tallyA[o]||0), allOpts.map(o => tallyB[o]||0) ];
-      const chi = chiSquareTest(table);
+      const baseA = groupA.filter(s => { const v = s.answers?.[oq.id]; return Array.isArray(v) ? v.length > 0 : !!v; }).length || 1;
+      const baseB = groupB.filter(s => { const v = s.answers?.[oq.id]; return Array.isArray(v) ? v.length > 0 : !!v; }).length || 1;
+      const pctNote = oq.type === 'checkbox'
+        ? `<div class="qa-meta" style="margin-top:4px">Base: A n=${baseA}, B n=${baseB} — multi-select, %s may exceed 100%</div>`
+        : '';
       const canvasId = 'cv-compare-' + oq.id;
       card.innerHTML = `<div class="qa-title">${esc(oq.label || '')}</div>
+        ${collapseNote ? `<div class="qa-meta">${esc(collapseNote)}</div>` : ''}
+        ${pctNote}
         <div class="chart-tall-wrap" style="min-height:${Math.max(160, allOpts.length*36)}px"><canvas id="${canvasId}"></canvas></div>
         ${chiSquareResultHTML(chi)}
         <div class="adv-export-row" style="margin-top:10px"><button class="btn" onclick="saveElementAsImage('compcard-${oq.id}', 'compare_${oq.id}', this)">📷 Save as image</button></div>`;
@@ -1342,11 +1637,13 @@ function updateSegment() {
     });
     const entries = Object.entries(tally).sort((a, b) => b[1] - a[1]);
     if (!entries.length) return '';
-    const totalAns = entries.reduce((a, [, c]) => a + c, 0);
+    // % base = respondents (in this segment) who answered oq, not total
+    // selections — checkbox breakdowns correctly sum to more than 100%.
+    const base = segment.filter(s => { const v = s.answers?.[oq.id]; return Array.isArray(v) ? v.length > 0 : !!v; }).length || 1;
     return `<div class="q-analytics-card" id="segcard-${oq.id}">
       <div class="qa-title">${esc(oq.label || '')}</div>
-      <div class="qa-meta">${segment.length} in segment</div>
-      <div class="legend">${entries.map(([k, c]) => `<div class="legend-item"><span class="legend-label">${esc(k)}</span><span class="legend-pct">${c} (${Math.round(c / totalAns * 100)}%)</span></div>`).join('')}</div>
+      <div class="qa-meta">${segment.length} in segment · base N=${base} answered${oq.type === 'checkbox' ? ' (multi-select, sums may exceed 100%)' : ''}</div>
+      <div class="legend">${entries.map(([k, c]) => `<div class="legend-item"><span class="legend-label">${esc(k)}</span><span class="legend-pct">${c} (${Math.round(c / base * 100)}%)</span></div>`).join('')}</div>
       <div class="adv-export-row" style="margin-top:10px"><button class="btn" onclick="saveElementAsImage('segcard-${oq.id}', 'segment_${oq.id}', this)">📷 Save as image</button></div>
     </div>`;
   }).filter(Boolean);
@@ -1356,8 +1653,408 @@ function updateSegment() {
     <div class="questions-grid">${cards.join('') || '<div class="adv-empty">No other multiple-choice/checkbox questions to break down.</div>'}</div>`;
 }
 
+/* ── Groups & Codebook ─────────────────────────────────────────────────────────
+   A derived group buckets one question's raw values into custom categories
+   (e.g. 8 communities → Lakeside/Inland "Stratum"). Once saved it's injected by
+   applyDerivedGroups() as a synthetic question, so it shows up automatically
+   in Crosstab/Segment/Compare Groups/Excel export with no special-casing there. */
+let groupEditorOpen = false;
+let groupEditorSource = null;
+
+const GUIDELINE_STRATUM = {
+  lakeside: ['Korankye', 'Mpakadan', 'Dodi Asantekrom', 'Labolabo Tornu'],
+  inland: ['Nyameben', 'Adjena Donor', 'Kudikope', 'Survey Line'],
+};
+
+// Auto-classifies a question from its type + answer pattern (not hardcoded to
+// this form's wording) into the analysis category it belongs to, mirroring
+// analysis_guideline.md §1's groups A–F.
+function classifyQuestion(q) {
+  if (q.type === 'checkbox') return { cat: 'Multi-select', analysis: 'Multi-response — % of respondents per option (sums >100%)' };
+  if (q.type === 'number' || q.type === 'date') return { cat: 'Number / Date', analysis: 'Descriptive stats (mean, median, min, max)' };
+  if (q.type === 'short' || q.type === 'long' || q.type === 'email') return { cat: 'Open-ended', analysis: 'Thematic coding (see Themes tab)' };
+  if (q.type === 'radio' || q.type === 'dropdown') {
+    const coder = getNumericCoder(q);
+    if (coder && Array.isArray(q.options) && q.options.length === 5) {
+      return { cat: 'Likert (5-point)', analysis: 'Mode + full SA/A/N/D/SD distribution + %Agree; cross-tab by group + chi-square/Fisher' };
+    }
+    if (Array.isArray(q.options) && q.options.length <= 3) {
+      return { cat: 'Binary / short categorical', analysis: 'Frequencies + %; cross-tab by group + chi-square' };
+    }
+    return { cat: 'Categorical', analysis: 'Frequencies + %; cross-tab by group + chi-square' };
+  }
+  return { cat: 'Other', analysis: '—' };
+}
+
+function renderGroupsAndCodebook(form, submissions) {
+  const el = document.getElementById('adv-groups');
+  const groups = form.groups || [];
+  const realQs = form.questions.filter(q => !q.derived);
+
+  const groupsHtml = groups.length ? groups.map(g => {
+    const srcQ = realQs.find(q => q.id === g.sourceQuestionId);
+    const counts = {};
+    submissions.forEach(s => { const v = s.answers?.['grp_' + g.id]; if (v) counts[v] = (counts[v] || 0) + 1; });
+    return `<div class="q-analytics-card" style="margin-bottom:14px">
+      <div class="qa-card-head">
+        <div>
+          <div class="qa-title">${esc(g.name)}</div>
+          <div class="qa-meta">Derived from "${esc(srcQ ? srcQ.label : g.sourceQuestionId)}"</div>
+        </div>
+        <button class="btn" style="padding:5px 10px;font-size:12px" onclick="deleteGroup('${esc(g.id)}')">Delete</button>
+      </div>
+      <div class="legend" style="margin-top:10px">${(g.buckets || []).map(b => `<div class="legend-item"><span class="legend-label">${esc(b.name)} <span style="color:var(--text3)">(${(b.values || []).join(', ')})</span></span><span class="legend-pct">${counts[b.name] || 0}</span></div>`).join('')}</div>
+    </div>`;
+  }).join('') : `<div class="adv-empty">No derived groups yet — e.g. bucket "What is your community?" into Lakeside/Inland for the comparative analysis.</div>`;
+
+  const qNumMap = questionNumberMap(form);
+  el.innerHTML = `
+    <p class="adv-hint">Bucket a question's raw values into a custom group (e.g. 8 communities → Lakeside/Inland "Stratum"). Once saved, the group appears everywhere alongside real questions — Crosstab, Segment, Compare Groups, and the Excel export.</p>
+    <div id="groups-list">${groupsHtml}</div>
+    <div class="adv-controls" style="margin-top:10px">
+      <button class="btn btn-primary" onclick="openGroupEditor()">+ New group</button>
+      <button class="btn" onclick="useGuidelineDefaultStratum()">Use guideline default (Lakeside/Inland Stratum)</button>
+    </div>
+    <div id="group-editor"></div>
+
+    <div class="section-title" style="margin-top:28px;font-size:14px">Codebook</div>
+    <p class="adv-hint">Auto-classified from each question's type and answer pattern — a quick reference for which analysis applies to which item.</p>
+    <div class="adv-export-row"><button class="btn" onclick="saveElementAsImage('codebook-content', 'codebook', this)">📷 Save as image</button></div>
+    <div id="codebook-content">
+      <div class="resp-table-wrap"><table class="adv-table">
+        <thead><tr><th>Q#</th><th>Question</th><th>Type</th><th>Recommended analysis</th></tr></thead>
+        <tbody>${realQs.filter(q => q.type !== 'section').map(q => {
+          const c = classifyQuestion(q);
+          return `<tr><td>Q${qNumMap[q.id]}</td><td style="text-align:left">${esc(q.label || '')}</td><td>${esc(c.cat)}</td><td style="text-align:left;font-size:12px">${esc(c.analysis)}</td></tr>`;
+        }).join('')}</tbody>
+      </table></div>
+    </div>`;
+
+  renderGroupEditor();
+}
+
+function openGroupEditor() {
+  groupEditorOpen = true;
+  groupEditorSource = null;
+  renderGroupEditor();
+}
+function closeGroupEditor() {
+  groupEditorOpen = false;
+  const el = document.getElementById('group-editor');
+  if (el) el.innerHTML = '';
+}
+
+function renderGroupEditor() {
+  const el = document.getElementById('group-editor');
+  if (!el) return;
+  if (!groupEditorOpen) { el.innerHTML = ''; return; }
+  const { form, submissions } = currentData;
+  const realQs = form.questions.filter(q => !q.derived);
+  const sourceQs = realQs.filter(q => isGroupable(q, submissions));
+  const opts = sourceQs.map(q => `<option value="${esc(q.id)}" ${q.id === groupEditorSource ? 'selected' : ''}>${esc(q.label || '')}</option>`).join('');
+
+  let bucketRows = '';
+  if (groupEditorSource) {
+    const srcQ = realQs.find(q => q.id === groupEditorSource);
+    const values = getGroupOptions(srcQ, submissions) || [];
+    bucketRows = values.map(v => `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+      <span style="flex:1;font-size:13px">${esc(v)}</span>
+      <input type="text" class="adv-select bucket-input" data-value="${esc(v)}" placeholder="Bucket name (e.g. Lakeside)" style="max-width:220px"/>
+    </div>`).join('');
+  }
+
+  el.innerHTML = `
+    <div class="q-analytics-card" style="margin-top:12px">
+      <div class="qa-title">New group</div>
+      <div class="adv-controls" style="margin-top:8px">
+        <div><label class="config-label" style="display:block;margin-bottom:5px;">Group name</label><input type="text" id="group-name-input" class="adv-select" placeholder="e.g. Stratum"/></div>
+        <div><label class="config-label" style="display:block;margin-bottom:5px;">Source question</label><select class="adv-select" id="group-source-select" onchange="setGroupEditorSource(this.value)"><option value="">Choose…</option>${opts}</select></div>
+      </div>
+      ${groupEditorSource ? `<div style="margin-top:14px"><label class="config-label" style="display:block;margin-bottom:8px;">Assign each value to a bucket (type the same bucket name to group values together)</label>${bucketRows}</div>` : ''}
+      <div style="margin-top:14px;display:flex;gap:8px">
+        <button class="btn btn-primary" onclick="saveNewGroup()">Save group</button>
+        <button class="btn" onclick="closeGroupEditor()">Cancel</button>
+      </div>
+    </div>`;
+}
+
+function setGroupEditorSource(qid) {
+  groupEditorSource = qid || null;
+  renderGroupEditor();
+}
+
+async function saveNewGroup() {
+  const { form } = currentData;
+  const name = (document.getElementById('group-name-input').value || '').trim();
+  if (!name) { alert('Give the group a name.'); return; }
+  if (!groupEditorSource) { alert('Choose a source question.'); return; }
+  const inputs = document.querySelectorAll('#group-editor .bucket-input');
+  const buckets = {};
+  inputs.forEach(inp => {
+    const bucketName = (inp.value || '').trim();
+    if (!bucketName) return;
+    const value = inp.dataset.value;
+    buckets[bucketName] = buckets[bucketName] || [];
+    buckets[bucketName].push(value);
+  });
+  if (!Object.keys(buckets).length) { alert('Assign at least one value to a bucket.'); return; }
+
+  const newGroup = {
+    id: 'g' + Date.now(),
+    name,
+    sourceQuestionId: groupEditorSource,
+    buckets: Object.entries(buckets).map(([bucketName, values]) => ({ name: bucketName, values })),
+  };
+  await saveGroups([...(form.groups || []), newGroup]);
+  closeGroupEditor();
+}
+
+async function deleteGroup(id) {
+  if (!confirm('Delete this group?')) return;
+  const { form } = currentData;
+  await saveGroups((form.groups || []).filter(g => g.id !== id));
+}
+
+async function useGuidelineDefaultStratum() {
+  const { form } = currentData;
+  const communityQ = form.questions.find(q => !q.derived && /community/i.test(q.label || ''));
+  if (!communityQ) { alert('Could not find a "community" question to bucket from.'); return; }
+  const newGroup = {
+    id: 'stratum',
+    name: 'Stratum',
+    sourceQuestionId: communityQ.id,
+    buckets: [
+      { name: 'Lakeside', values: GUIDELINE_STRATUM.lakeside },
+      { name: 'Inland', values: GUIDELINE_STRATUM.inland },
+    ],
+  };
+  await saveGroups([...(form.groups || []).filter(g => g.id !== 'stratum'), newGroup]);
+}
+
+async function saveGroups(groups) {
+  const { form } = currentData;
+  try {
+    const r = await fetch(_analyticsServerUrl + '/analysis-groups', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ formId: form.id, groups }),
+      signal: AbortSignal.timeout(15000),
+    });
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.error || 'Save failed');
+    await loadAnalytics(form.id);
+  } catch (e) {
+    alert('Could not save group: ' + e.message);
+  }
+}
+
+/* ── Data Quality ──────────────────────────────────────────────────────────────
+   analysis_guideline.md §6's pre-flight checklist, automated: missing % per
+   item, straight-lining across the Likert block, and near-duplicate category
+   values (the exact "Nyamben" vs "Nyameben" class of bug this project hit by
+   hand this session) via a self-contained Levenshtein check. */
+function renderDataQuality(form, submissions) {
+  const el = document.getElementById('adv-quality');
+  const realQs = form.questions.filter(q => q.type !== 'section' && !q.derived);
+  const qNumMap = questionNumberMap(form);
+
+  const missingRows = realQs.map(q => {
+    const answered = submissions.filter(s => { const v = s.answers?.[q.id]; return Array.isArray(v) ? v.length > 0 : (v !== undefined && v !== null && v !== ''); }).length;
+    const missing = submissions.length - answered;
+    return { q, answered, missing, pct: submissions.length ? Math.round(missing / submissions.length * 100) : 0 };
+  });
+
+  const likertQs = realQs.filter(q => isAgreeLikert(q));
+  const straightLiners = [];
+  if (likertQs.length >= 5) {
+    submissions.forEach(s => {
+      const codes = [];
+      likertQs.forEach(q => {
+        const coder = getNumericCoder(q);
+        const code = coder(s.answers?.[q.id]);
+        if (code != null) codes.push(code);
+      });
+      if (codes.length >= 5 && new Set(codes).size === 1) {
+        straightLiners.push({ s, count: codes.length, value: codes[0] });
+      }
+    });
+  }
+
+  const dupCandidates = [];
+  realQs.filter(q => q.type === 'short' || q.type === 'email').forEach(q => {
+    const values = getGroupOptions(q, submissions);
+    if (!values || values.length < 2) return;
+    for (let i = 0; i < values.length; i++) {
+      for (let j = i + 1; j < values.length; j++) {
+        const dist = levenshtein(values[i].toLowerCase(), values[j].toLowerCase());
+        if (dist > 0 && dist <= 2) dupCandidates.push({ q, a: values[i], b: values[j], dist });
+      }
+    }
+  });
+
+  el.innerHTML = `
+    <p class="adv-hint">Automated pre-flight checks before running the comparative analysis (analysis_guideline.md §6).</p>
+
+    <div class="section-title" style="font-size:14px">Missing data per question</div>
+    <div class="adv-export-row"><button class="btn" onclick="saveElementAsImage('quality-missing-content', 'missing_data', this)">📷 Save as image</button></div>
+    <div id="quality-missing-content">
+      <div class="resp-table-wrap"><table class="adv-table">
+        <thead><tr><th>Q#</th><th>Question</th><th>Answered</th><th>Missing</th><th>% Missing</th></tr></thead>
+        <tbody>${missingRows.map(r => `<tr><td>Q${qNumMap[r.q.id] || ''}</td><td style="text-align:left">${esc(r.q.label || '')}</td><td>${r.answered}</td><td>${r.missing}</td><td>${r.pct}%</td></tr>`).join('')}</tbody>
+      </table></div>
+    </div>
+
+    <div class="section-title" style="margin-top:24px;font-size:14px">Straight-lining</div>
+    <p class="adv-hint">Respondents who gave the exact same Likert answer across all ${likertQs.length} scale items — worth spot-checking for low engagement or a data-entry error.</p>
+    <div id="quality-straightline-content">
+      ${straightLiners.length ? `<div class="resp-table-wrap"><table class="adv-table">
+        <thead><tr><th>Respondent</th><th>Submitted</th><th>Items</th><th>Answer given every time</th></tr></thead>
+        <tbody>${straightLiners.map(sl => `<tr><td style="text-align:left">${esc(sl.s.respondentName || ('#' + sl.s.id))}</td><td>${new Date(sl.s.submittedAt).toLocaleDateString()}</td><td>${sl.count}</td><td>Code ${sl.value}</td></tr>`).join('')}</tbody>
+      </table></div>` : `<div class="adv-empty">No straight-lining detected.</div>`}
+    </div>
+
+    <div class="section-title" style="margin-top:24px;font-size:14px">Possible duplicate / typo'd category values</div>
+    <p class="adv-hint">Distinct short-answer values (e.g. community names) that are nearly identical — likely the same real-world value spelled two different ways.</p>
+    <div id="quality-dup-content">
+      ${dupCandidates.length ? `<div class="resp-table-wrap"><table class="adv-table">
+        <thead><tr><th>Question</th><th>Value A</th><th>Value B</th><th>Edit distance</th></tr></thead>
+        <tbody>${dupCandidates.map(d => `<tr><td style="text-align:left">${esc(d.q.label || '')}</td><td>${esc(d.a)}</td><td>${esc(d.b)}</td><td>${d.dist}</td></tr>`).join('')}</tbody>
+      </table></div>` : `<div class="adv-empty">No likely duplicates detected.</div>`}
+    </div>`;
+}
+
+/* ── Themes (qualitative tagging) ──────────────────────────────────────────────
+   Generic to any long/short question, not hardcoded to "q28" — tag each
+   open-ended answer with recurring themes, then see theme-frequency counts.
+   Tags persist to submissions.theme_tags (separate from answers, see
+   api/submissions.js) via a PATCH-on-change pattern, matching how AI Edit and
+   respondent renames already save. */
+let themesSelectedQ = null;
+
+function renderThemes(form, submissions) {
+  const el = document.getElementById('adv-themes');
+  const textQs = form.questions.filter(q => q.type === 'long' || q.type === 'short');
+  if (!textQs.length) {
+    el.innerHTML = `<div class="adv-empty">No open-ended (short answer/paragraph) questions to tag.</div>`;
+    return;
+  }
+  if (!themesSelectedQ || !textQs.find(q => q.id === themesSelectedQ)) {
+    themesSelectedQ = (textQs.find(q => q.type === 'long') || textQs[0]).id;
+  }
+  const opts = textQs.map(q => `<option value="${esc(q.id)}" ${q.id === themesSelectedQ ? 'selected' : ''}>${esc(q.label || '')}</option>`).join('');
+
+  el.innerHTML = `
+    <p class="adv-hint">Tag open-ended answers with recurring themes, then see theme frequency across respondents.</p>
+    <div class="adv-controls">
+      <div><label class="config-label" style="display:block;margin-bottom:5px;">Question</label><select class="adv-select" id="themes-q-select" onchange="setThemesQuestion(this.value)">${opts}</select></div>
+    </div>
+    <div id="themes-freq"></div>
+    <div id="themes-answers" style="margin-top:16px"></div>`;
+
+  renderThemesBody();
+}
+
+function setThemesQuestion(qid) {
+  themesSelectedQ = qid;
+  renderThemesBody();
+}
+
+function renderThemesBody() {
+  const { form, submissions } = currentData;
+  const q = form.questions.find(qq => qq.id === themesSelectedQ);
+  if (!q) return;
+  const answered = submissions.filter(s => { const v = s.answers?.[q.id]; return v !== undefined && v !== null && String(v).trim() !== ''; });
+
+  const tagCounts = {};
+  answered.forEach(s => { (s.themeTags?.[q.id] || []).forEach(t => { tagCounts[t] = (tagCounts[t] || 0) + 1; }); });
+  const tagEntries = Object.entries(tagCounts).sort((a, b) => b[1] - a[1]);
+  const base = answered.length || 1;
+
+  const freqEl = document.getElementById('themes-freq');
+  freqEl.innerHTML = `
+    <div class="section-title" style="font-size:14px">Theme frequency</div>
+    <p class="adv-hint">Base: ${answered.length} respondent${answered.length === 1 ? '' : 's'} answered this question.</p>
+    <div class="adv-export-row"><button class="btn" onclick="saveElementAsImage('themes-freq-content', 'theme_frequency', this)">📷 Save as image</button></div>
+    <div id="themes-freq-content">
+      ${tagEntries.length ? `
+      <div class="legend">${tagEntries.map(([t, c]) => `<div class="legend-item"><span class="legend-label">${esc(t)}</span><span class="legend-pct">${c} (${Math.round(c / base * 100)}%)</span></div>`).join('')}</div>
+      <div class="chart-tall-wrap" style="margin-top:12px;min-height:${Math.max(120, tagEntries.length * 34)}px"><canvas id="cv-themes-chart"></canvas></div>
+      ` : `<div class="adv-empty">No themes tagged yet — add tags to answers below.</div>`}
+    </div>`;
+
+  if (tagEntries.length) {
+    const existing = chartInstances.find(c => c.canvas && c.canvas.id === 'cv-themes-chart');
+    if (existing) { try { existing.destroy(); } catch (e) {} chartInstances = chartInstances.filter(c => c !== existing); }
+    const canvas = document.getElementById('cv-themes-chart');
+    canvas.height = Math.max(120, tagEntries.length * 34);
+    const chart = new Chart(canvas.getContext('2d'), {
+      type: 'bar',
+      data: { labels: tagEntries.map(e => e[0]), datasets: [{ data: tagEntries.map(e => e[1]), backgroundColor: '#2a5c45', borderRadius: 4, maxBarThickness: 26 }] },
+      options: {
+        indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+        scales: { x: { beginAtZero: true, ticks: { precision: 0, font: { size: 11 }, color: '#a8a49e' }, grid: { color: '#f0ede6' } }, y: { ticks: { font: { size: 11.5 }, color: '#1a1916' }, grid: { display: false } } },
+      },
+    });
+    chartInstances.push(chart);
+  }
+
+  const answersEl = document.getElementById('themes-answers');
+  answersEl.innerHTML = `
+    <div class="section-title" style="font-size:14px">Answers</div>
+    <div class="questions-grid">${answered.map(s => {
+      const tags = s.themeTags?.[q.id] || [];
+      return `<div class="q-analytics-card">
+        <div class="qa-meta">${esc(s.respondentName || ('#' + s.id))}</div>
+        <div style="margin:8px 0;font-size:13.5px;line-height:1.5">${esc(s.answers[q.id])}</div>
+        <div id="tags-${s.id}">${tags.map(t => `<span class="sig-badge notsig" style="margin:0 6px 6px 0;display:inline-block">${esc(t)} <button onclick="removeThemeTag(${s.id},'${esc(q.id)}','${encodeURIComponent(t)}')" style="border:none;background:none;cursor:pointer;color:inherit;font-weight:700;margin-left:2px">&times;</button></span>`).join('')}</div>
+        <div style="display:flex;gap:6px;margin-top:8px">
+          <input type="text" class="adv-select" id="tag-input-${s.id}" placeholder="Add tag…" style="flex:1" onkeydown="if(event.key==='Enter'){addThemeTag(${s.id},'${esc(q.id)}')}"/>
+          <button class="btn" onclick="addThemeTag(${s.id},'${esc(q.id)}')">Add</button>
+        </div>
+      </div>`;
+    }).join('') || '<div class="adv-empty">No answers to this question yet.</div>'}</div>`;
+}
+
+async function addThemeTag(submissionId, qid) {
+  const input = document.getElementById('tag-input-' + submissionId);
+  const tag = (input.value || '').trim();
+  if (!tag) return;
+  const s = currentData.submissions.find(s => s.id === submissionId);
+  const tags = Array.from(new Set([...(s.themeTags?.[qid] || []), tag]));
+  await saveThemeTags(submissionId, qid, tags);
+}
+
+async function removeThemeTag(submissionId, qid, encodedTag) {
+  const tag = decodeURIComponent(encodedTag);
+  const s = currentData.submissions.find(s => s.id === submissionId);
+  const tags = (s.themeTags?.[qid] || []).filter(t => t !== tag);
+  await saveThemeTags(submissionId, qid, tags);
+}
+
+async function saveThemeTags(submissionId, qid, tags) {
+  const { form } = currentData;
+  try {
+    const r = await fetch(_analyticsServerUrl + '/submissions', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ formId: form.id, id: submissionId, questionId: qid, tags }),
+      signal: AbortSignal.timeout(15000),
+    });
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.error || 'Save failed');
+    await loadAnalytics(form.id);
+  } catch (e) {
+    alert('Could not save tag: ' + e.message);
+  }
+}
+
 /* ── Tabs + entry point ───────────────────────────────────────────────────── */
+// Remembered across loadAnalytics() reloads (every group/tag save reloads the
+// whole page's data) so editing a group or adding a theme tag doesn't bounce
+// the user back to the Descriptives tab each time.
+let activeAdvTab = 'desc';
 function switchAdvTab(name) {
+  activeAdvTab = name;
   document.querySelectorAll('.adv-tab-btn').forEach(b => b.classList.toggle('active', b.dataset.adv === name));
   document.querySelectorAll('.adv-panel').forEach(p => p.classList.toggle('active', p.id === 'adv-' + name));
 }
@@ -1369,6 +2066,10 @@ function renderAdvancedAnalysis(data) {
   renderCorrelationMatrix(form, submissions);
   renderSegmentControls(form, submissions);
   renderCompareControls(form, submissions);
+  renderGroupsAndCodebook(form, submissions);
+  renderDataQuality(form, submissions);
+  renderThemes(form, submissions);
+  switchAdvTab(activeAdvTab);
 }
 
 function filenameBase() {
@@ -1726,8 +2427,13 @@ function addCrosstabSheet(wb, form, submissions) {
   if (!rowSel || !colSel) return;
   const qRow = form.questions.find(q => q.id === rowSel.value), qCol = form.questions.find(q => q.id === colSel.value);
   if (!qRow || !qCol || qRow.id === qCol.id) return;
-  const { rowOpts, colOpts, table } = computeCrosstab(qRow, qCol, submissions);
+  // Mirror whatever collapse level is currently selected on screen (if any).
+  const rowLevelsEl = document.getElementById('crosstab-row-levels'), colLevelsEl = document.getElementById('crosstab-col-levels');
+  const rowLevels = (isAgreeLikert(qRow) && rowLevelsEl) ? Number(rowLevelsEl.value) : 5;
+  const colLevels = (isAgreeLikert(qCol) && colLevelsEl) ? Number(colLevelsEl.value) : 5;
+  const { rowOpts, colOpts, table } = computeCrosstab(qRow, qCol, submissions, rowLevels, colLevels);
   const aoa = [[`${qRow.label} \\ ${qCol.label}`, ...colOpts, 'Total']];
+  if (rowLevels !== 5 || colLevels !== 5) aoa.unshift([`Collapsed — rows: ${rowLevels}-level, columns: ${colLevels}-level`]);
   rowOpts.forEach((r, ri) => aoa.push([r, ...table[ri], table[ri].reduce((a, b) => a + b, 0)]));
   const colTotals = colOpts.map((_, ci) => table.reduce((a, r) => a + r[ci], 0));
   aoa.push(['Total', ...colTotals, colTotals.reduce((a, b) => a + b, 0)]);
@@ -1740,7 +2446,12 @@ function addCrosstabSheet(wb, form, submissions) {
     aoa.push(['N', chi.n]);
     aoa.push(['p-value', chi.p < 0.001 ? '<0.001' : +chi.p.toFixed(4)]);
     aoa.push(['Significant at p<0.05?', chi.p < 0.05 ? 'Yes' : 'No']);
-    if (chi.lowExpected) aoa.push(['Note', 'Some expected cell counts are below 5 — result may be unreliable']);
+    aoa.push(["Cramér's V (effect size)", +chi.cramersV.toFixed(3)]);
+    if (chi.fisherP !== null) {
+      aoa.push(["Fisher's exact test p-value", chi.fisherP < 0.001 ? '<0.001' : +chi.fisherP.toFixed(4)]);
+      aoa.push(["Fisher's significant at p<0.05?", chi.fisherP < 0.05 ? 'Yes' : 'No']);
+    }
+    if (chi.lowExpected) aoa.push(['Note', 'Some expected cell counts are below 5 — chi-square may be unreliable' + (chi.fisherP !== null ? '; rely on Fisher\'s exact test instead' : '; consider collapsing to fewer levels')]);
   }
   const ws = XLSX.utils.aoa_to_sheet(aoa);
   ws['!cols'] = [{ wch: 30 }, ...colOpts.map(() => ({ wch: 16 })), { wch: 10 }];
@@ -1768,17 +2479,20 @@ function addCompareGroupsSheet(wb, form, submissions) {
   otherQs.forEach(oq => {
     const coder = getNumericCoder(oq);
     if (isGroupable(oq, submissions) || oq.type === 'checkbox') {
-      const tallyA = {}, tallyB = {};
-      groupA.forEach(s => { const v = s.answers?.[oq.id]; (Array.isArray(v) ? v : (v ? [v] : [])).forEach(vv => { if (vv) tallyA[vv] = (tallyA[vv]||0)+1; }); });
-      groupB.forEach(s => { const v = s.answers?.[oq.id]; (Array.isArray(v) ? v : (v ? [v] : [])).forEach(vv => { if (vv) tallyB[vv] = (tallyB[vv]||0)+1; }); });
-      const allOpts = getGroupOptions(oq, submissions) || Array.from(new Set([...Object.keys(tallyA), ...Object.keys(tallyB)]));
+      const { allOpts, tallyA, tallyB, chi, collapseNote } = collapsedCompareTable(oq, groupA, groupB, submissions);
       if (!allOpts.some(o => (tallyA[o]||0)+(tallyB[o]||0) > 0)) return;
+      // % base = respondents who answered oq, not total selections — matters
+      // for checkbox questions, where it sums >100%.
+      const baseA = groupA.filter(s => { const v = s.answers?.[oq.id]; return Array.isArray(v) ? v.length > 0 : !!v; }).length || 1;
+      const baseB = groupB.filter(s => { const v = s.answers?.[oq.id]; return Array.isArray(v) ? v.length > 0 : !!v; }).length || 1;
       aoa.push([oq.label]);
-      aoa.push(['', '', 'Group A: ' + aVal, 'Group B: ' + bVal]);
-      allOpts.forEach(o => aoa.push(['', o, tallyA[o]||0, tallyB[o]||0]));
-      const table = [ allOpts.map(o => tallyA[o]||0), allOpts.map(o => tallyB[o]||0) ];
-      const chi = chiSquareTest(table);
-      if (chi) aoa.push(['', `χ²(${chi.df}, N=${chi.n}) = ${chi.chiSq.toFixed(2)}, p ${chi.p<0.001?'<0.001':'='+chi.p.toFixed(3)} — ${chi.p<0.05?'significant':'not significant'} at p<0.05`]);
+      if (collapseNote) aoa.push([collapseNote]);
+      aoa.push(['', '', `Group A: ${aVal} (n=${baseA})`, `Group B: ${bVal} (n=${baseB})`]);
+      allOpts.forEach(o => aoa.push(['', o, `${tallyA[o]||0} (${Math.round((tallyA[o]||0)/baseA*100)}%)`, `${tallyB[o]||0} (${Math.round((tallyB[o]||0)/baseB*100)}%)`]));
+      if (chi) {
+        aoa.push(['', `χ²(${chi.df}, N=${chi.n}) = ${chi.chiSq.toFixed(2)}, p ${chi.p<0.001?'<0.001':'='+chi.p.toFixed(3)} — ${chi.p<0.05?'significant':'not significant'} at p<0.05; Cramér's V = ${chi.cramersV.toFixed(2)}`]);
+        if (chi.fisherP !== null) aoa.push(['', `Fisher's exact test: p ${chi.fisherP<0.001?'<0.001':'='+chi.fisherP.toFixed(3)} — ${chi.fisherP<0.05?'significant':'not significant'} at p<0.05`]);
+      }
       aoa.push([]);
     } else if (coder) {
       const statsA = computeDescriptives(oq, groupA, coder), statsB = computeDescriptives(oq, groupB, coder);
@@ -1813,13 +2527,147 @@ function addSegmentSheet(wb, form, submissions) {
     });
     const entries = Object.entries(tally).sort((a, b) => b[1] - a[1]);
     if (!entries.length) return;
-    aoa.push([oq.label]);
-    entries.forEach(([k, c]) => aoa.push(['', k, c]));
+    // % base = respondents in this segment who answered oq, not total
+    // selections — checkbox breakdowns correctly sum to more than 100%.
+    const base = segment.filter(s => { const v = s.answers?.[oq.id]; return Array.isArray(v) ? v.length > 0 : !!v; }).length || 1;
+    aoa.push([oq.label + (oq.type === 'checkbox' ? ` (base N=${base}, multi-select)` : '')]);
+    entries.forEach(([k, c]) => aoa.push(['', k, c, Math.round(c / base * 100) + '%']));
     aoa.push([]);
   });
   const ws = XLSX.utils.aoa_to_sheet(aoa);
   ws['!cols'] = [{ wch: 45 }, { wch: 35 }, { wch: 8 }];
   XLSX.utils.book_append_sheet(wb, ws, 'Segment');
+}
+
+function addGroupsCodebookSheet(wb, form, submissions) {
+  const groups = form.groups || [];
+  const realQs = form.questions.filter(q => !q.derived);
+  const qNumMap = questionNumberMap(form);
+  const aoa = [['Derived Groups'], []];
+  if (groups.length) {
+    groups.forEach(g => {
+      const srcQ = realQs.find(q => q.id === g.sourceQuestionId);
+      aoa.push([g.name, 'Derived from: ' + (srcQ ? srcQ.label : g.sourceQuestionId)]);
+      (g.buckets || []).forEach(b => aoa.push(['', b.name, (b.values || []).join(', ')]));
+      aoa.push([]);
+    });
+  } else {
+    aoa.push(['(none defined)']);
+    aoa.push([]);
+  }
+  aoa.push(['Codebook']);
+  aoa.push(['Q#', 'Question', 'Type', 'Recommended analysis']);
+  realQs.filter(q => q.type !== 'section').forEach(q => {
+    const c = classifyQuestion(q);
+    aoa.push(['Q' + qNumMap[q.id], q.label, c.cat, c.analysis]);
+  });
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [{ wch: 10 }, { wch: 45 }, { wch: 22 }, { wch: 55 }];
+  XLSX.utils.book_append_sheet(wb, ws, 'Groups & Codebook');
+}
+
+function addDataQualitySheet(wb, form, submissions) {
+  const realQs = form.questions.filter(q => q.type !== 'section' && !q.derived);
+  const qNumMap = questionNumberMap(form);
+  const aoa = [['Missing data per question'], ['Q#', 'Question', 'Answered', 'Missing', '% Missing']];
+  realQs.forEach(q => {
+    const answered = submissions.filter(s => { const v = s.answers?.[q.id]; return Array.isArray(v) ? v.length > 0 : (v !== undefined && v !== null && v !== ''); }).length;
+    const missing = submissions.length - answered;
+    aoa.push(['Q' + qNumMap[q.id], q.label, answered, missing, submissions.length ? Math.round(missing / submissions.length * 100) + '%' : '0%']);
+  });
+  aoa.push([]);
+
+  const likertQs = realQs.filter(q => isAgreeLikert(q));
+  aoa.push(['Straight-lining (' + likertQs.length + ' Likert items checked)']);
+  aoa.push(['Respondent', 'Submitted', 'Items', 'Answer given every time']);
+  let anyStraight = false;
+  if (likertQs.length >= 5) {
+    submissions.forEach(s => {
+      const codes = [];
+      likertQs.forEach(q => { const code = getNumericCoder(q)(s.answers?.[q.id]); if (code != null) codes.push(code); });
+      if (codes.length >= 5 && new Set(codes).size === 1) {
+        anyStraight = true;
+        aoa.push([s.respondentName || ('#' + s.id), new Date(s.submittedAt).toLocaleDateString(), codes.length, 'Code ' + codes[0]]);
+      }
+    });
+  }
+  if (!anyStraight) aoa.push(['(none detected)']);
+  aoa.push([]);
+
+  aoa.push(['Possible duplicate / typo\'d category values']);
+  aoa.push(['Question', 'Value A', 'Value B', 'Edit distance']);
+  let anyDup = false;
+  realQs.filter(q => q.type === 'short' || q.type === 'email').forEach(q => {
+    const values = getGroupOptions(q, submissions);
+    if (!values || values.length < 2) return;
+    for (let i = 0; i < values.length; i++) {
+      for (let j = i + 1; j < values.length; j++) {
+        const dist = levenshtein(values[i].toLowerCase(), values[j].toLowerCase());
+        if (dist > 0 && dist <= 2) { anyDup = true; aoa.push([q.label, values[i], values[j], dist]); }
+      }
+    }
+  });
+  if (!anyDup) aoa.push(['(none detected)']);
+
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [{ wch: 35 }, { wch: 35 }, { wch: 14 }, { wch: 14 }];
+  XLSX.utils.book_append_sheet(wb, ws, 'Data Quality');
+}
+
+function addThemesSheet(wb, form, submissions) {
+  const textQs = form.questions.filter(q => q.type === 'long' || q.type === 'short');
+  const taggedQs = textQs.filter(q => submissions.some(s => (s.themeTags?.[q.id] || []).length));
+  if (!taggedQs.length) return;
+  const aoa = [];
+  taggedQs.forEach(q => {
+    const answered = submissions.filter(s => { const v = s.answers?.[q.id]; return v !== undefined && v !== null && String(v).trim() !== ''; });
+    const tagCounts = {};
+    answered.forEach(s => { (s.themeTags?.[q.id] || []).forEach(t => { tagCounts[t] = (tagCounts[t] || 0) + 1; }); });
+    const base = answered.length || 1;
+    aoa.push([q.label]);
+    aoa.push(['Theme frequency (base N=' + answered.length + ' answered)']);
+    Object.entries(tagCounts).sort((a, b) => b[1] - a[1]).forEach(([t, c]) => aoa.push(['', t, c, Math.round(c / base * 100) + '%']));
+    aoa.push([]);
+    aoa.push(['Respondent', 'Answer', 'Tags']);
+    answered.forEach(s => aoa.push([s.respondentName || ('#' + s.id), s.answers[q.id], (s.themeTags?.[q.id] || []).join(', ')]));
+    aoa.push([]);
+  });
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [{ wch: 22 }, { wch: 60 }, { wch: 30 }];
+  XLSX.utils.book_append_sheet(wb, ws, 'Themes');
+}
+
+// Mirrors the on-screen "Run full comparison report" (Compare Groups tab) —
+// only exports if that report has actually been run this session, since
+// otherwise there's nothing meaningful to show.
+function addComparisonReportSheet(wb, form, submissions) {
+  const reportCard = document.getElementById('compare-report-card');
+  if (!reportCard) return;
+  const qSel = document.getElementById('compare-q'), aSel = document.getElementById('compare-a'), bSel = document.getElementById('compare-b');
+  if (!qSel || !aSel || !bSel) return;
+  const q = form.questions.find(qq => qq.id === qSel.value);
+  const aVal = aSel.value, bVal = bSel.value;
+  const inGroup = (s, val) => { const v = s.answers?.[q.id]; return Array.isArray(v) ? v.includes(val) : v === val; };
+  const groupA = submissions.filter(s => inGroup(s, aVal));
+  const groupB = submissions.filter(s => inGroup(s, bVal));
+  const otherQs = form.questions.filter(qq => qq.type !== 'section' && qq.id !== q.id && (isGroupable(qq, submissions) || qq.type === 'checkbox'));
+
+  const aoa = [[`Full comparison report: ${aVal} vs ${bVal}`], []];
+  aoa.push(['Question', 'Test used', 'p-value', "Cramér's V", 'Significant?']);
+  const rows = [];
+  otherQs.forEach(oq => {
+    const { chi, collapseNote } = collapsedCompareTable(oq, groupA, groupB, submissions);
+    if (!chi) return;
+    const test = chi.fisherP !== null ? "Fisher's exact (2-level)" : (collapseNote ? 'Chi-square (3-level)' : 'Chi-square');
+    const p = chi.fisherP !== null ? chi.fisherP : chi.p;
+    rows.push({ label: oq.label || oq.id, test, p, sig: p < 0.05, v: chi.cramersV });
+  });
+  rows.sort((a, b) => a.p - b.p);
+  rows.forEach(r => aoa.push([r.label, r.test, +r.p.toFixed(4), +r.v.toFixed(2), r.sig ? 'Yes' : 'No']));
+
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [{ wch: 45 }, { wch: 22 }, { wch: 10 }, { wch: 10 }, { wch: 12 }];
+  XLSX.utils.book_append_sheet(wb, ws, 'Comparison Report');
 }
 
 // Orders submissions community-by-community (alphabetical), and P001 upward
@@ -1868,6 +2716,10 @@ function exportXLSX() {
   addCrosstabSheet(wb, form, submissions);
   addSegmentSheet(wb, form, submissions);
   addCompareGroupsSheet(wb, form, submissions);
+  addComparisonReportSheet(wb, form, submissions);
+  addGroupsCodebookSheet(wb, form, submissions);
+  addDataQualitySheet(wb, form, submissions);
+  addThemesSheet(wb, form, submissions);
 
   XLSX.writeFile(wb, (form.title||'responses').replace(/[^a-z0-9]/gi,'_')+'_responses.xlsx');
 }

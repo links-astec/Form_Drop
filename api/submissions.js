@@ -26,7 +26,26 @@ module.exports = async function handler(req, res) {
   // ({formId, ids, questionId, value}), or rename respondents where each
   // submission can get its own distinct name ({formId, renames: [{id, respondentName}]})
   if (req.method === "PATCH") {
-    const { formId, ids, questionId, value, renames } = req.body;
+    const { formId, ids, questionId, value, renames, id, tags } = req.body;
+
+    // Theme tags — set the tag list for one submission's one (open-ended) question,
+    // stored separately from `answers` so tagging can never touch submitted data.
+    if (id !== undefined && Array.isArray(tags) && questionId) {
+      if (!formId) return res.status(400).json({ ok: false, error: "formId is required" });
+      if (!Number.isInteger(Number(id))) return res.status(400).json({ ok: false, error: "id must be a submission id number" });
+      try {
+        const result = await query(
+          `UPDATE submissions
+           SET theme_tags = jsonb_set(COALESCE(theme_tags, '{}'::jsonb), ARRAY[$1::text], $2::jsonb, true)
+           WHERE id = $3 AND form_id = $4`,
+          [questionId, JSON.stringify(tags), Number(id), formId]
+        );
+        return res.json({ ok: true, updated: result.rowCount });
+      } catch (err) {
+        console.error("Set theme tags error:", err);
+        return res.status(500).json({ ok: false, error: err.message });
+      }
+    }
 
     if (Array.isArray(renames) && renames.length) {
       if (!formId) return res.status(400).json({ ok: false, error: "formId is required" });
