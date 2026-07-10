@@ -692,8 +692,9 @@ function renderChoiceChart(q, submissions, type) {
 }
 
 /* ── All responses table ───────────────────────────────────────────────────── */
-function renderTable(form, submissions) {
+function renderTable(form, rawSubmissions) {
   const table = document.getElementById('resp-table');
+  const submissions = sortByCommunityThenNumber(rawSubmissions);
   const hasRespondents = submissions.some(s => s.respondentName);
   const qNumMap = questionNumberMap(form);
   const headers = ['#', 'Submitted', ...(hasRespondents ? ['Respondent'] : []), ...form.questions.map(q => q.label || (qNumMap[q.id] ? `Q${qNumMap[q.id]}` : ''))];
