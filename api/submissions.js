@@ -6,7 +6,7 @@
 // already-collected responses. The AI never touches this endpoint directly —
 // it only proposes a plan; the client resolves exactly which submission ids
 // are affected and shows the user a confirmation before this ever runs.
-const { query } = require("./_db");
+const { query, ensureTables } = require("./_db");
 
 function setCors(res) {
   res.setHeader("Access-Control-Allow-Origin", process.env.ALLOWED_ORIGIN || "*");
@@ -20,6 +20,12 @@ module.exports = async function handler(req, res) {
 
   if (!process.env.DATABASE_URL) {
     return res.status(500).json({ ok: false, error: "DATABASE_URL is not set in Vercel environment variables." });
+  }
+
+  try {
+    await ensureTables();
+  } catch (dbErr) {
+    return res.status(500).json({ ok: false, error: "Database connection failed: " + dbErr.message });
   }
 
   // PATCH — either bulk-set one question's answer for a set of submissions

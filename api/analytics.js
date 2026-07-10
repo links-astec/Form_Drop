@@ -1,4 +1,4 @@
-const { query } = require("./_db");
+const { query, ensureTables } = require("./_db");
 
 function setCors(res) {
   res.setHeader("Access-Control-Allow-Origin", process.env.ALLOWED_ORIGIN || "*");
@@ -19,6 +19,7 @@ module.exports = async function handler(req, res) {
   }
 
   try {
+    await ensureTables();
     // Form definition
     const { rows: formRows } = await query(
       `SELECT id, title, description, questions, analysis_groups FROM forms WHERE id = $1`,

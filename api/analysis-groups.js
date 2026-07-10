@@ -4,7 +4,7 @@
 // Kept separate from api/forms.js's full-form upsert (which guards against silently wiping
 // questions) so saving a group definition can never interact with that guard or touch anything
 // else on the form.
-const { query } = require("./_db");
+const { query, ensureTables } = require("./_db");
 
 function setCors(res) {
   res.setHeader("Access-Control-Allow-Origin", process.env.ALLOWED_ORIGIN || "*");
@@ -18,6 +18,12 @@ module.exports = async function handler(req, res) {
 
   if (!process.env.DATABASE_URL) {
     return res.status(500).json({ ok: false, error: "DATABASE_URL is not set in Vercel environment variables." });
+  }
+
+  try {
+    await ensureTables();
+  } catch (dbErr) {
+    return res.status(500).json({ ok: false, error: "Database connection failed: " + dbErr.message });
   }
 
   if (req.method === "GET") {

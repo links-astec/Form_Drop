@@ -1,34 +1,4 @@
-const { query } = require("./_db");
-
-let _tablesReady = false;
-
-async function ensureTables() {
-  await query(`
-    CREATE TABLE IF NOT EXISTS forms (
-      id          TEXT PRIMARY KEY,
-      title       TEXT NOT NULL,
-      description TEXT,
-      questions   JSONB NOT NULL DEFAULT '[]',
-      numbered    BOOLEAN NOT NULL DEFAULT false,
-      cover       JSONB NOT NULL DEFAULT '{}',
-      created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-    CREATE TABLE IF NOT EXISTS submissions (
-      id             BIGSERIAL PRIMARY KEY,
-      form_id        TEXT NOT NULL REFERENCES forms(id) ON DELETE CASCADE,
-      answers        JSONB NOT NULL DEFAULT '{}',
-      submitted_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      respondent_name TEXT
-    );
-    CREATE INDEX IF NOT EXISTS submissions_form_id_idx ON submissions(form_id);
-    ALTER TABLE submissions ADD COLUMN IF NOT EXISTS respondent_name TEXT;
-    ALTER TABLE forms ADD COLUMN IF NOT EXISTS numbered BOOLEAN NOT NULL DEFAULT false;
-    ALTER TABLE forms ADD COLUMN IF NOT EXISTS cover JSONB NOT NULL DEFAULT '{}';
-    ALTER TABLE forms ADD COLUMN IF NOT EXISTS analysis_groups JSONB NOT NULL DEFAULT '[]';
-    ALTER TABLE submissions ADD COLUMN IF NOT EXISTS theme_tags JSONB NOT NULL DEFAULT '{}';
-  `);
-}
+const { query, ensureTables } = require("./_db");
 
 function setCors(res) {
   res.setHeader("Access-Control-Allow-Origin", process.env.ALLOWED_ORIGIN || "*");
@@ -49,7 +19,7 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    if (!_tablesReady) { await ensureTables(); _tablesReady = true; }
+    await ensureTables();
   } catch (dbErr) {
     return res.status(500).json({
       ok: false,
