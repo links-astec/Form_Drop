@@ -695,7 +695,8 @@ function renderChoiceChart(q, submissions, type) {
 function renderTable(form, submissions) {
   const table = document.getElementById('resp-table');
   const hasRespondents = submissions.some(s => s.respondentName);
-  const headers = ['#', 'Submitted', ...(hasRespondents ? ['Respondent'] : []), ...form.questions.map((q,i) => q.label||`Q${i+1}`)];
+  const qNumMap = questionNumberMap(form);
+  const headers = ['#', 'Submitted', ...(hasRespondents ? ['Respondent'] : []), ...form.questions.map(q => q.label || (qNumMap[q.id] ? `Q${qNumMap[q.id]}` : ''))];
   const thead = headers.map(h => `<th>${esc(h)}</th>`).join('');
   const rows = submissions.map((s, i) => {
     const date = new Date(s.submittedAt).toLocaleString();
@@ -776,6 +777,18 @@ function isGroupable(q, submissions) {
   return !!getGroupOptions(q, submissions);
 }
 
+// Maps each non-section question id to its real, original position on the
+// form (1-based, matching the numbering shown to respondents in fill.html —
+// section dividers aren't counted). Used everywhere a subset of questions
+// (e.g. only the Likert-scale ones) is displayed as "Q1, Q2…" so the labels
+// stay anchored to the actual question numbers instead of renumbering from 1.
+function questionNumberMap(form) {
+  const map = {};
+  let n = 0;
+  form.questions.forEach(q => { if (q.type !== 'section') map[q.id] = ++n; });
+  return map;
+}
+
 /* ── Descriptives ─────────────────────────────────────────────────────────── */
 function computeDescriptives(q, submissions, coder) {
   const values = [];
@@ -802,11 +815,12 @@ let descChartRows = [];
 
 function renderDescriptives(form, submissions) {
   const el = document.getElementById('adv-desc');
+  const qNumMap = questionNumberMap(form);
   const rows = form.questions
     .filter(q => q.type !== 'section')
     .map(q => ({ q, coder: getNumericCoder(q) }))
     .filter(x => x.coder)
-    .map(({ q, coder }) => ({ q, stats: computeDescriptives(q, submissions, coder) }))
+    .map(({ q, coder }) => ({ q, num: qNumMap[q.id], stats: computeDescriptives(q, submissions, coder) }))
     .filter(x => x.stats);
   descChartRows = rows;
 
@@ -865,7 +879,7 @@ function renderDescChart(rows, stat) {
   if (existing) { try { existing.destroy(); } catch(e){} chartInstances = chartInstances.filter(c => c !== existing); }
 
   canvas.height = Math.max(220, rows.length * 32);
-  const labels = rows.map((r, i) => `Q${i+1}`);
+  const labels = rows.map(r => `Q${r.num}`);
   const values = rows.map(r => r.stats[stat]);
   const statLabel = stat.charAt(0).toUpperCase() + stat.slice(1);
   const ctx = canvas.getContext('2d');
@@ -1082,9 +1096,10 @@ function corrColor(v) {
 
 function renderCorrelationMatrix(form, submissions) {
   const el = document.getElementById('adv-corr');
+  const qNumMap = questionNumberMap(form);
   const codeable = form.questions
     .filter(q => q.type !== 'section')
-    .map(q => ({ q, coder: getNumericCoder(q) }))
+    .map(q => ({ q, num: qNumMap[q.id], coder: getNumericCoder(q) }))
     .filter(x => x.coder);
 
   if (codeable.length < 2) {
@@ -1114,9 +1129,9 @@ function renderCorrelationMatrix(form, submissions) {
     <div id="adv-corr-content">
       <p class="adv-hint">Pearson correlation between every pair of Likert-scale/number questions (needs ≥3 shared answers). +1 = move perfectly together, −1 = move perfectly opposite, 0 = unrelated. Hover a row/column for the full question text.</p>
       <div class="resp-table-wrap"><table class="adv-table" style="font-size:11.5px">
-        <thead><tr><th></th>${codeable.map((c, i) => `<th title="${esc(c.q.label)}">Q${i + 1}</th>`).join('')}</tr></thead>
+        <thead><tr><th></th>${codeable.map(c => `<th title="${esc(c.q.label)}">Q${c.num}</th>`).join('')}</tr></thead>
         <tbody>
-          ${codeable.map((c, i) => `<tr><td title="${esc(c.q.label)}" style="white-space:nowrap;max-width:240px;overflow:hidden;text-overflow:ellipsis;">Q${i + 1}. ${esc(c.q.label)}</td>${matrix[i].map(v => v === null ? '<td style="color:var(--text3)">—</td>' : `<td style="background:${corrColor(v)}">${v.toFixed(2)}</td>`).join('')}</tr>`).join('')}
+          ${codeable.map((c, i) => `<tr><td title="${esc(c.q.label)}" style="white-space:nowrap;max-width:240px;overflow:hidden;text-overflow:ellipsis;">Q${c.num}. ${esc(c.q.label)}</td>${matrix[i].map(v => v === null ? '<td style="color:var(--text3)">—</td>' : `<td style="background:${corrColor(v)}">${v.toFixed(2)}</td>`).join('')}</tr>`).join('')}
         </tbody>
       </table></div>
     </div>`;
@@ -1672,15 +1687,16 @@ function addDescriptivesSheet(wb, form, submissions) {
 }
 
 function addCorrelationSheet(wb, form, submissions) {
+  const qNumMap = questionNumberMap(form);
   const codeable = form.questions
     .filter(q => q.type !== 'section')
-    .map(q => ({ q, coder: getNumericCoder(q) }))
+    .map(q => ({ q, num: qNumMap[q.id], coder: getNumericCoder(q) }))
     .filter(x => x.coder);
   if (codeable.length < 2) return;
   const n = codeable.length;
-  const aoa = [['', ...codeable.map((c, i) => 'Q' + (i + 1))]];
+  const aoa = [['', ...codeable.map(c => 'Q' + c.num)]];
   for (let i = 0; i < n; i++) {
-    const row = [`Q${i + 1}. ${codeable[i].q.label}`];
+    const row = [`Q${codeable[i].num}. ${codeable[i].q.label}`];
     for (let j = 0; j < n; j++) {
       if (i === j) { row.push(1); continue; }
       const xs = [], ys = [];
@@ -1696,7 +1712,7 @@ function addCorrelationSheet(wb, form, submissions) {
   }
   aoa.push([]);
   aoa.push(['Question key:']);
-  codeable.forEach((c, i) => aoa.push([`Q${i + 1}`, c.q.label]));
+  codeable.forEach(c => aoa.push([`Q${c.num}`, c.q.label]));
   const ws = XLSX.utils.aoa_to_sheet(aoa);
   ws['!cols'] = [{ wch: 45 }, ...codeable.map(() => ({ wch: 7 }))];
   XLSX.utils.book_append_sheet(wb, ws, 'Correlation Matrix');
@@ -1805,9 +1821,31 @@ function addSegmentSheet(wb, form, submissions) {
   XLSX.utils.book_append_sheet(wb, ws, 'Segment');
 }
 
+// Orders submissions community-by-community (alphabetical), and P001 upward
+// within each community — matches the "P0XX (Community)" respondent-name
+// convention used throughout the dataset. Anything not following that
+// pattern (no parsed community/number) is left at the end, in its original
+// order, so nothing silently disappears from the export.
+function sortByCommunityThenNumber(submissions) {
+  const parsed = submissions.map((s, i) => {
+    const m = (s.respondentName || '').match(/^P(\d+)\s*\(([^)]+)\)\s*$/);
+    return { s, i, num: m ? parseInt(m[1], 10) : null, community: m ? m[2].trim() : null };
+  });
+  parsed.sort((a, b) => {
+    if (a.community === null && b.community === null) return a.i - b.i;
+    if (a.community === null) return 1;
+    if (b.community === null) return -1;
+    const c = a.community.localeCompare(b.community);
+    if (c !== 0) return c;
+    return a.num - b.num;
+  });
+  return parsed.map(p => p.s);
+}
+
 function exportXLSX() {
   if (!currentData) return;
-  const { form, submissions } = currentData;
+  const { form, submissions: rawSubmissions } = currentData;
+  const submissions = sortByCommunityThenNumber(rawSubmissions);
   const cols = buildExportColumns(form.questions);
   const hasRespondents = submissions.some(s => s.respondentName);
   const header = ['Submission #', 'Submitted At', ...(hasRespondents ? ['Respondent'] : []), ...cols.map(c => c.header)];
